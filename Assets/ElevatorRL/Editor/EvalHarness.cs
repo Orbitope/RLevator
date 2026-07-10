@@ -70,6 +70,39 @@ namespace ElevatorRL.Editor
             Debug.Log("[Eval] " + Summarize(episode, dir));
         }
 
+        // Headless validation of the AS1 target-floor sub-controller (EXPERIMENT_PLAN.md §7).
+        // Drives the sim with LOOK-chosen targets resolved through TargetFloorControl — the same
+        // deterministic sub-controller the RL agent uses in AS1 mode — so we can confirm the
+        // target→primitive resolution reproduces LOOK-like behavior WITHOUT entering Play mode.
+        // NOTE: this recomputes targets every decision (like LOOK), so it does NOT exercise AS1's
+        // commitment-persistence / sparse-decision semantics — that part only lives in the agent
+        // and needs a Play-mode run to validate. This validates the resolve/target mechanics only.
+        static int[] TargetFloorLookDispatch(Building b)
+        {
+            var targets = TargetFloorControl.LookTargets(b);
+            var act = new int[b.cfg.numElevators];
+            for (int i = 0; i < b.cfg.numElevators; i++)
+                act[i] = TargetFloorControl.ResolveTowardTarget(b, i, targets[i]);
+            return act;
+        }
+
+        [MenuItem("Tools/Elevator RL/Validate AS1 (LOOK vs TargetFloorLook, same seed)")]
+        static void ValidateTargetFloorMechanics()
+        {
+            const int seed = 1;
+            var (look, lookDir) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, "S-smoke",
+                8, 3, 8, TrafficPattern.UpPeak, SmokeIntensity, seed, 3600f, 300f, 300f);
+            var (tfl, tflDir) = RunSingle("TargetFloorLook", TargetFloorLookDispatch, "S-smoke",
+                8, 3, 8, TrafficPattern.UpPeak, SmokeIntensity, seed, 3600f, 300f, 300f);
+
+            Debug.Log("[Eval] " + Summarize(look, lookDir));
+            Debug.Log("[Eval] " + Summarize(tfl, tflDir));
+            Debug.Log($"[Eval] TargetFloorLook vs LOOK (same seed={seed}): delivered " +
+                      $"{look.delivered}→{tfl.delivered}, waitP95 {look.waitP95:0.0}→{tfl.waitP95:0.0}s, " +
+                      $"abandoned {look.abandoned}→{tfl.abandoned} — expect broadly similar " +
+                      "(same target logic, slightly different resolve).");
+        }
+
         [MenuItem("Tools/Elevator RL/Run Comparison (LOOK vs ETA vs ETA-weighted, same seed)")]
         static void RunComparisonUpPeak() => RunComparison(TrafficPattern.UpPeak);
 

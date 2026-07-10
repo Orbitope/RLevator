@@ -373,6 +373,27 @@ policy-chosen target instead of a heuristically-computed one. Recommended defaul
 (already in place), get E2/E3 baseline numbers, then build AS1 and run E9 — don't let this block
 the M1/M2 milestones below.
 
+**AS1 IMPLEMENTED (mechanics validated headlessly; agent loop pending a Play-mode run).**
+- `TargetFloorControl` (runtime) holds the reusable stateless pieces: `ResolveTowardTarget`
+  (committed target → one primitive action; services current floor, opportunistic same-direction
+  boarding, else steps toward target), `CommitmentFulfilled` (arrived + nothing left to do → time
+  to re-query the policy), and `LookTargets` (LOOK-equivalent *target* selector = CollectiveLook
+  passes 1–2 returning target floors — the AS1 heuristic/demonstration policy).
+- `ElevatorControllerAgent` gains an `ActionSpaceMode { Primitive, TargetFloor }` toggle:
+  `Initialize` sizes branches (6 for AS0, `numFloors` for AS1); `FixedUpdate` runs the per-tick
+  deterministic driver for committed cars and requests a decision only when a car actually needs a
+  new target (sparse, semi-MDP); `OnActionReceived` adopts targets only for asking cars (in-flight
+  cars' branches are masked to a single option); `WriteDiscreteActionMask` restricts asking cars to
+  in-range floors and locks committed cars; `Heuristic` emits `LookTargets`. Reward is drained per
+  (sparse) decision → correct semi-MDP credit attribution.
+- **Validation (headless, no Play mode):** a `TargetFloorLook` dispatcher (`LookTargets` +
+  `ResolveTowardTarget`, recomputed each tick) reproduces LOOK within a few percent on
+  8fl/3cars/UpPeak/i=0.5/seed=1 (delivered 1680→1708, waitP95 37.2→36.4s, abandoned 27→24) —
+  slightly better because the resolve boards both directions when idle at a target. Menu:
+  **Tools ▸ Elevator RL ▸ Validate AS1**. This confirms the target/resolve logic; it does NOT
+  exercise the agent's commitment-persistence / sparse-decision loop (that lives only in the agent
+  and needs a Play-mode run — fold into the ML-Agents integration check before the E9 training).
+
 ---
 
 ## 8. Milestones
@@ -389,7 +410,10 @@ the M1/M2 milestones below.
 3. **M2 — Scale curve (E3).** Train/eval across S→H; produce the gap-vs-rung headline figure.
 4. **M3 — Zoning + obs (E4, E5).** The thesis core + cheap ablations.
 5. **M4 — Architecture + generalization (E6, E7).** Unlock large fleets; one-policy-many-fleets.
-6. **M5 — Action space (E9).** Build AS1 (target-floor); compare against AS0.
+6. **M5 — Action space (E9) — AS1 built + mechanics validated; comparison pending training.**
+   `TargetFloorControl` + agent `ActionSpaceMode.TargetFloor` implemented, sub-controller validated
+   headlessly vs LOOK (§7). Remaining: Play-mode check of the commitment loop, then train AS0 vs
+   AS1 and compare sample-efficiency/asymptote.
 7. **M6 — Stretch + write-up (E8).** Fairness, transfer, emergent-strategy visuals.
 
 ---
