@@ -50,3 +50,7 @@ Thumbs.db
 
 # JetBrains
 .idea/
+
+# Elevator RL eval output (raw per-run data; see STATS_VIZ_REPLAY_PLAN.md §3 —
+# curated results belong in Results/, which IS tracked)
+/Runs/

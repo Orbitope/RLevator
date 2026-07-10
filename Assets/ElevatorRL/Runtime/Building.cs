@@ -38,6 +38,15 @@ namespace ElevatorRL
         public int DeliveredTotal, RejectedTotal, AbandonedTotal;
         public float WaitSum; public int WaitCount; public float MaxWaitObserved;
 
+        // lifetime reward decomposition (for logging / stats; accumulated in CollectReward)
+        public double RwTotal, RwDelivered, RwToward, RwAway, RwRejected, RwAbandoned, RwInElevator, RwInQueue;
+
+        // observational events for telemetry only (no effect on sim; null when unsubscribed)
+        public event Action<Passenger> OnArrival;          // queued (not rejected)
+        public event Action<Passenger, float> OnDelivered; // (passenger, rideSeconds)
+        public event Action<Passenger> OnAbandoned;        // left a hall queue past maxWait
+        public event Action<int> OnRejected;               // arrival denied at floor (full queue)
+
         Acc _acc;
         readonly System.Random _rng;
         bool _patternLoaded;
@@ -70,6 +79,7 @@ namespace ElevatorRL
             _acc = default;
             DeliveredTotal = RejectedTotal = AbandonedTotal = WaitCount = 0;
             WaitSum = MaxWaitObserved = 0f;
+            RwTotal = RwDelivered = RwToward = RwAway = RwRejected = RwAbandoned = RwInElevator = RwInQueue = 0;
             _patternLoaded = false;
 
             for (int f = 0; f < cfg.numFloors; f++) { upQ[f].Clear(); downQ[f].Clear(); }
@@ -138,8 +148,8 @@ namespace ElevatorRL
                     if (d == f) continue;
                     var p = new Passenger(_pid++, f, d, simTime);
                     var q = p.Dir > 0 ? upQ[f] : downQ[f];
-                    if (q.Count >= cfg.maxQueue) { _acc.rejected++; RejectedTotal++; }
-                    else q.Add(p);
+                    if (q.Count >= cfg.maxQueue) { _acc.rejected++; RejectedTotal++; OnRejected?.Invoke(f); }
+                    else { q.Add(p); OnArrival?.Invoke(p); }
                 }
             }
         }
@@ -156,7 +166,7 @@ namespace ElevatorRL
         void ExpireOne(List<Passenger> q)
         {
             for (int i = q.Count - 1; i >= 0; i--)
-                if (q[i].waitTime >= cfg.maxWait) { q.RemoveAt(i); _acc.abandoned++; AbandonedTotal++; }
+                if (q[i].waitTime >= cfg.maxWait) { var pp = q[i]; q.RemoveAt(i); _acc.abandoned++; AbandonedTotal++; OnAbandoned?.Invoke(pp); }
         }
 
         void AdvanceCars(float dt)
@@ -215,6 +225,7 @@ namespace ElevatorRL
                     {
                         _acc.delivered++; DeliveredTotal++;
                         WaitSum += p.waitTime; WaitCount++;
+                        OnDelivered?.Invoke(p, p.age - p.waitTime);
                         c.riders.RemoveAt(i);
                     }
                 }
@@ -281,13 +292,18 @@ namespace ElevatorRL
 
         public float CollectReward()
         {
-            float r = reward.delivered * _acc.delivered
-                    + reward.movedToward * _acc.toward
-                    + reward.movedAway * _acc.away
-                    + reward.rejected * _acc.rejected
-                    + reward.abandoned * _acc.abandoned
-                    + reward.inElevator * _acc.riderSeconds
-                    + reward.inQueue * _acc.queueSeconds;
+            float rDel = reward.delivered   * _acc.delivered;
+            float rTow = reward.movedToward * _acc.toward;
+            float rAwy = reward.movedAway   * _acc.away;
+            float rRej = reward.rejected    * _acc.rejected;
+            float rAbn = reward.abandoned   * _acc.abandoned;
+            float rInE = reward.inElevator  * _acc.riderSeconds;
+            float rInQ = reward.inQueue     * _acc.queueSeconds;
+            float r = rDel + rTow + rAwy + rRej + rAbn + rInE + rInQ;
+
+            RwDelivered += rDel; RwToward += rTow; RwAway += rAwy; RwRejected += rRej;
+            RwAbandoned += rAbn; RwInElevator += rInE; RwInQueue += rInQ; RwTotal += r;
+
             _acc = default;
             return r;
         }
