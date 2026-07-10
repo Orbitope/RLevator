@@ -8,20 +8,41 @@ using UnityEditor;
 namespace ElevatorRL.Editor
 {
     /// <summary>
-    /// Headless evaluation runner (seed of the M1 sweep). Runs a deterministic episode under a
-    /// chosen dispatcher, drives a StatsCollector, and writes the three canonical CSV tables.
-    /// Also the correctness smoke test for the M0 instrumentation.
+    /// Headless evaluation runner. Runs deterministic episodes under a chosen dispatcher against
+    /// a BuildingConfig (inline or a scale-ladder preset asset), drives a StatsCollector, and
+    /// writes the three canonical CSV tables. RunSweep is the E1 baseline-characterization driver
+    /// (EXPERIMENT_PLAN.md §4): every (preset × dispatcher × pattern × intensity × seed) cell,
+    /// aggregated to a summary CSV.
     /// </summary>
     public static class EvalHarness
     {
         /// <summary>A dispatch policy: given the live Building, return one action per car.</summary>
         public delegate int[] Dispatcher(Building b);
 
-        // NOTE: intensity=1.0 saturates this 8-floor/3-car preset under UpPeak (~41% rejection —
+        /// <summary>
+        /// Builds a FRESH dispatcher for one episode. Required because EtaHeuristic is stateful
+        /// (sticky assignments) — reusing one instance across episodes would leak state between
+        /// runs. CollectiveLook is stateless and safely reused.
+        /// </summary>
+        public delegate Dispatcher DispatcherFactory(int numElevators);
+
+        /// <summary>The three implemented baselines (EXPERIMENT_PLAN.md §1), in report order.</summary>
+        public static readonly (string name, DispatcherFactory factory)[] Policies =
+        {
+            ("LOOK",         numCars => ElevatorHeuristics.CollectiveLook),
+            ("ETA",          numCars => new EtaHeuristic(numCars).Dispatch),
+            ("ETA-Weighted", numCars => new EtaHeuristic(numCars, weightByQueueDepth: true).Dispatch),
+        };
+
+        const string PresetFolder = "Assets/ElevatorRL/Config/Presets";
+
+        // NOTE: intensity=1.0 saturates the S preset (8fl/3cars) under UpPeak (~41% rejection —
         // floor-0 arrival rate already exceeds fleet throughput capacity there). Use ~0.5 for a
         // representative, non-saturated comparison; sweep intensity deliberately for the
         // saturation-curve experiments (EXPERIMENT_PLAN.md E1/E3).
         const float SmokeIntensity = 0.5f;
+
+        // ── Ad hoc smoke tests (inline config, no preset asset needed) ─────────
 
         [MenuItem("Tools/Elevator RL/Run Eval (LOOK smoke test)")]
         static void RunLookSmokeTest()
@@ -102,13 +123,268 @@ namespace ElevatorRL.Editor
             $"abandoned={e.abandoned} rejected={e.rejected} " +
             $"util={e.utilFleetMean:0.00} rwTotal={e.rwTotal:0} → {runDir}";
 
-        /// <summary>Runs one episode headlessly under the given dispatcher, writes CSVs.</summary>
+        // ── E1 sweep: preset assets × policies × patterns × intensities × seeds ─
+
+        [MenuItem("Tools/Elevator RL/Run E1 Sweep - Quick (all rungs, sanity check)")]
+        static void RunSweepQuick()
+        {
+            // Smallest sweep that still touches every rung and every policy: proves the pipeline
+            // (esp. Z/H's floorRange + H's variable fleet) runs cleanly everywhere before
+            // committing to the full multi-pattern/intensity/seed sweep below.
+            RunSweep(
+                presetNames: new[] { "S", "M", "L", "Z", "H" },
+                patterns: new[] { TrafficPattern.UpPeak },
+                intensities: new[] { SmokeIntensity },
+                seeds: new[] { 1 },
+                totalSeconds: 1200f, warmupSeconds: 120f, bucketSeconds: 300f,
+                sweepName: "E1-quick");
+        }
+
+        [MenuItem("Tools/Elevator RL/Run E1 Sweep - Full (S-M-L-Z-H x patterns x intensities x seeds)")]
+        static void RunSweepFull()
+        {
+            // NOTE: this is a large, long-running synchronous call (5 rungs x 3 policies x 3
+            // patterns x 2 intensities x 3 seeds = 270 episodes at 1 simulated hour each) — it
+            // will make the Editor unresponsive for several minutes. Prefer the Quick sweep for
+            // interactive iteration; run Full when you're ready to let it churn.
+            RunSweep(
+                presetNames: new[] { "S", "M", "L", "Z", "H" },
+                patterns: new[] { TrafficPattern.UpPeak, TrafficPattern.DownPeak, TrafficPattern.Lunch },
+                intensities: new[] { 0.5f, 1.0f },
+                seeds: new[] { 1, 2, 3 },
+                totalSeconds: 3600f, warmupSeconds: 300f, bucketSeconds: 300f,
+                sweepName: "E1-full");
+        }
+
+        static Dictionary<string, BuildingConfig> LoadPresets(string[] presetNames)
+        {
+            var presets = new Dictionary<string, BuildingConfig>();
+            foreach (var name in presetNames)
+            {
+                var path = $"{PresetFolder}/{name}_BuildingConfig.asset";
+                var cfg = AssetDatabase.LoadAssetAtPath<BuildingConfig>(path);
+                if (cfg == null)
+                {
+                    Debug.LogError($"[Eval] Preset not found at {path} — run " +
+                                    "Tools/Elevator RL/Generate Scale Ladder Presets first.");
+                    return null;
+                }
+                presets[name] = cfg;
+            }
+            return presets;
+        }
+
+        static void RunSweep(string[] presetNames, TrafficPattern[] patterns, float[] intensities,
+            int[] seeds, float totalSeconds, float warmupSeconds, float bucketSeconds, string sweepName)
+        {
+            var presets = LoadPresets(presetNames);
+            if (presets == null) return;
+
+            var summaryRows = new List<string>();
+            int cellCount = presetNames.Length * Policies.Length * patterns.Length * intensities.Length;
+            int cell = 0, totalEpisodes = 0;
+
+            foreach (var presetName in presetNames)
+            {
+                var presetAsset = presets[presetName];
+                foreach (var (policyName, factory) in Policies)
+                foreach (var pattern in patterns)
+                foreach (var intensity in intensities)
+                {
+                    cell++;
+                    var cellEpisodes = new List<EpisodeStats>(seeds.Length);
+                    foreach (var seed in seeds)
+                    {
+                        var dispatch = factory(presetAsset.numElevators);
+                        var (episode, _) = RunWithPreset(policyName, dispatch, presetName, presetAsset,
+                            pattern, intensity, seed, totalSeconds, warmupSeconds, bucketSeconds);
+                        cellEpisodes.Add(episode);
+                        totalEpisodes++;
+                    }
+                    summaryRows.Add(SummaryRow(presetName, policyName, pattern, intensity,
+                        calibratedBase: intensity, intensityMultiplier: 1f, cellEpisodes));
+                }
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string sweepDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-{sweepName}");
+            StatsCsv.Write(Path.Combine(sweepDir, "summary.csv"), SummaryHeader, summaryRows);
+
+            Debug.Log($"[Eval] Sweep '{sweepName}' complete: {cell} cells, {totalEpisodes} episodes → " +
+                      $"{Path.Combine(sweepDir, "summary.csv")}");
+        }
+
+        // ── E1 sweep, calibrated: per (preset, pattern), bisect a base intensity against LOOK ──
+
+        [MenuItem("Tools/Elevator RL/Run E1 Sweep - Calibrated (auto-tuned intensity per rung x pattern)")]
+        static void RunSweepCalibratedQuick()
+        {
+            // calibLo=0.005 (not 0.05): Z/H's true crossing points sit far lower than S/M/L's
+            // (~0.006-0.016 vs ~0.1-1.1) because zoned dispatch has much lower effective capacity
+            // per unit of nominal intensity — a 0.05 floor was pinning both at a false, degenerate
+            // "floor" value rather than their real (much lower) calibration point.
+            RunSweepCalibrated(
+                presetNames: new[] { "S", "M", "L", "Z", "H" },
+                patterns: new[] { TrafficPattern.UpPeak, TrafficPattern.Lunch },
+                multiples: new[] { 0.5f, 1.0f, 1.5f },
+                seeds: new[] { 1, 2 },
+                targetAbandonRate: 0.10f,
+                calibIterations: 10, calibLo: 0.005f, calibHi: 4f,
+                totalSeconds: 1200f, warmupSeconds: 120f, bucketSeconds: 300f,
+                sweepName: "E1-calibrated");
+        }
+
+        [MenuItem("Tools/Elevator RL/Diagnose Z-H Calibration Floor (widened search, no full sweep)")]
+        static void DiagnoseZHCalibrationFloor()
+        {
+            // Prior calibration runs pinned at calibLo=0.05 for both Z and H — the bisection
+            // math (mid after 8 halvings from lo=0.05 is exactly 0.0654) proves the 10%-abandon
+            // target was never met even at the search floor. This checks whether a real crossing
+            // point exists further down (lo=0.005) or whether Z/H can't reach 10% abandonment at
+            // any meaningful intensity given their current car allocation.
+            var presets = LoadPresets(new[] { "Z", "H" });
+            if (presets == null) return;
+
+            foreach (var name in new[] { "Z", "H" })
+            {
+                var asset = presets[name];
+                float baseIntensity = CalibrateIntensity(asset, TrafficPattern.UpPeak, seed: 1,
+                    targetAbandonRate: 0.10f, lo: 0.005f, hi: 4f, iterations: 12,
+                    totalSeconds: 1200f, warmupSeconds: 120f);
+
+                // probe the actual abandonRate AT the returned calibration point (quiet run) so we
+                // can see whether it's a genuine crossing or another pinned floor.
+                var (probe, _) = RunWithPreset("LOOK", ElevatorHeuristics.CollectiveLook, "diag",
+                    asset, TrafficPattern.UpPeak, baseIntensity, seed: 1,
+                    totalSeconds: 1200f, warmupSeconds: 120f, bucketSeconds: 1200f, quiet: true);
+
+                Debug.Log($"[Eval] {name}/UpPeak: calibrated intensity={baseIntensity:F4} → " +
+                          $"abandonRate={probe.abandonRate:P1} (target 10%) " +
+                          $"[lo floor was 0.005; pinned-at-floor value would be ≈0.00654]");
+            }
+        }
+
+        /// <summary>
+        /// Finds, via bisection against LOOK, the intensity at which abandonment rate ≈
+        /// targetAbandonRate for this preset+pattern — so different scale-ladder rungs are
+        /// compared at a comparable RELATIVE load instead of an identical raw intensity value
+        /// (which, even after PassengerArrivals' hub-floor scaling fix, may not land every rung
+        /// at the same saturation point, since capacity also depends on floor count, car count,
+        /// and zoning). Runs quiet (no CSV writes) — only the summary row for the real sweep at
+        /// each multiple of the calibrated base is persisted.
+        /// </summary>
+        static float CalibrateIntensity(BuildingConfig presetAsset, TrafficPattern pattern, int seed,
+            float targetAbandonRate, float lo, float hi, int iterations,
+            float totalSeconds, float warmupSeconds)
+        {
+            float mid = lo;
+            for (int iter = 0; iter < iterations; iter++)
+            {
+                mid = (lo + hi) / 2f;
+                var (episode, _) = RunWithPreset("LOOK", ElevatorHeuristics.CollectiveLook, "calib",
+                    presetAsset, pattern, mid, seed, totalSeconds, warmupSeconds,
+                    bucketSeconds: totalSeconds, quiet: true);
+                if (episode.abandonRate > targetAbandonRate) hi = mid; else lo = mid;
+            }
+            return mid;
+        }
+
+        static void RunSweepCalibrated(string[] presetNames, TrafficPattern[] patterns, float[] multiples,
+            int[] seeds, float targetAbandonRate, int calibIterations, float calibLo, float calibHi,
+            float totalSeconds, float warmupSeconds, float bucketSeconds, string sweepName)
+        {
+            var presets = LoadPresets(presetNames);
+            if (presets == null) return;
+
+            var summaryRows = new List<string>();
+            int cell = 0, totalEpisodes = 0;
+            int calibSeed = seeds.Length > 0 ? seeds[0] : 1;
+
+            foreach (var presetName in presetNames)
+            {
+                var presetAsset = presets[presetName];
+                foreach (var pattern in patterns)
+                {
+                    float baseIntensity = CalibrateIntensity(presetAsset, pattern, calibSeed,
+                        targetAbandonRate, calibLo, calibHi, calibIterations, totalSeconds, warmupSeconds);
+                    Debug.Log($"[Eval] Calibrated {presetName}/{pattern}: base intensity = " +
+                              $"{baseIntensity:F3} (target abandonRate={targetAbandonRate:P0}, LOOK, seed={calibSeed})");
+
+                    foreach (var multiple in multiples)
+                    {
+                        float intensity = baseIntensity * multiple;
+                        foreach (var (policyName, factory) in Policies)
+                        {
+                            cell++;
+                            var cellEpisodes = new List<EpisodeStats>(seeds.Length);
+                            foreach (var seed in seeds)
+                            {
+                                var dispatch = factory(presetAsset.numElevators);
+                                var (episode, _) = RunWithPreset(policyName, dispatch, presetName,
+                                    presetAsset, pattern, intensity, seed,
+                                    totalSeconds, warmupSeconds, bucketSeconds);
+                                cellEpisodes.Add(episode);
+                                totalEpisodes++;
+                            }
+                            summaryRows.Add(SummaryRow(presetName, policyName, pattern, intensity,
+                                baseIntensity, multiple, cellEpisodes));
+                        }
+                    }
+                }
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string sweepDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-{sweepName}");
+            StatsCsv.Write(Path.Combine(sweepDir, "summary.csv"), SummaryHeader, summaryRows);
+
+            Debug.Log($"[Eval] Calibrated sweep '{sweepName}' complete: {cell} cells, {totalEpisodes} " +
+                      $"episodes → {Path.Combine(sweepDir, "summary.csv")}");
+        }
+
+        const string SummaryHeader =
+            "preset,policy,pattern,intensity,calibratedBase,intensityMultiplier,seeds,delivered_mean," +
+            "waitMean_mean,waitP95_mean,waitMax_mean,abandoned_mean,rejected_mean,abandonRate_mean," +
+            "rwTotal_mean,utilFleetMean_mean";
+
+        static string SummaryRow(string preset, string policy, TrafficPattern pattern, float intensity,
+            float calibratedBase, float intensityMultiplier, List<EpisodeStats> episodes)
+        {
+            int n = episodes.Count;
+            float delivered = 0, waitMean = 0, waitP95 = 0, waitMax = 0, abandoned = 0, rejected = 0,
+                  abandonRate = 0, rwTotal = 0, util = 0;
+            foreach (var e in episodes)
+            {
+                delivered += e.delivered; waitMean += e.waitMean; waitP95 += e.waitP95;
+                waitMax += e.waitMax; abandoned += e.abandoned; rejected += e.rejected;
+                abandonRate += e.abandonRate; rwTotal += e.rwTotal; util += e.utilFleetMean;
+            }
+            return $"{preset},{policy},{pattern},{intensity},{calibratedBase:F3},{intensityMultiplier:F2},{n}," +
+                   $"{delivered / n:F2},{waitMean / n:F3},{waitP95 / n:F3},{waitMax / n:F3}," +
+                   $"{abandoned / n:F2},{rejected / n:F2},{abandonRate / n:F4},{rwTotal / n:F1},{util / n:F4}";
+        }
+
+        /// <summary>Runs one episode against a preset BuildingConfig asset (cloned, never dirtied).</summary>
+        public static (EpisodeStats episode, string runDir) RunWithPreset(string policy, Dispatcher dispatch,
+            string presetName, BuildingConfig presetAsset,
+            TrafficPattern pattern, float intensity, int seed,
+            float totalSeconds, float warmupSeconds, float bucketSeconds, bool quiet = false)
+        {
+            var cfg = ScriptableObject.Instantiate(presetAsset); // clone: preserves floorRange etc.
+            var reward  = ScriptableObject.CreateInstance<RewardConfig>();
+            var obs     = ScriptableObject.CreateInstance<ObservationConfig>();
+            var traffic = ScriptableObject.CreateInstance<TrafficConfig>();
+            traffic.useDayCycle = false; traffic.defaultPattern = pattern; traffic.intensity = intensity;
+
+            return RunCore(policy, dispatch, presetName, cfg, reward, obs, traffic, seed,
+                totalSeconds, warmupSeconds, bucketSeconds, quiet);
+        }
+
+        /// <summary>Runs one episode from inline topology (ad hoc smoke tests; no preset asset).</summary>
         public static (EpisodeStats episode, string runDir) RunSingle(string policy, Dispatcher dispatch,
             string preset, int floors, int cars, int capacity,
             TrafficPattern pattern, float intensity, int seed,
-            float totalSeconds, float warmupSeconds, float bucketSeconds)
+            float totalSeconds, float warmupSeconds, float bucketSeconds, bool quiet = false)
         {
-            // self-contained configs (don't touch saved assets)
             var cfg = ScriptableObject.CreateInstance<BuildingConfig>();
             cfg.numFloors = floors; cfg.numElevators = cars; cfg.capacity = capacity;
             cfg.randomizeActive = false; cfg.minActiveElevators = 1; cfg.serviceChangeProbability = 0f;
@@ -118,6 +394,15 @@ namespace ElevatorRL.Editor
             var traffic = ScriptableObject.CreateInstance<TrafficConfig>();
             traffic.useDayCycle = false; traffic.defaultPattern = pattern; traffic.intensity = intensity;
 
+            return RunCore(policy, dispatch, preset, cfg, reward, obs, traffic, seed,
+                totalSeconds, warmupSeconds, bucketSeconds, quiet);
+        }
+
+        static (EpisodeStats episode, string runDir) RunCore(string policy, Dispatcher dispatch,
+            string presetName, BuildingConfig cfg, RewardConfig reward, ObservationConfig obs,
+            TrafficConfig traffic, int seed, float totalSeconds, float warmupSeconds, float bucketSeconds,
+            bool quiet = false)
+        {
             var b = new Building(cfg, reward, obs, traffic, seed);
             b.Reset();
 
@@ -144,10 +429,10 @@ namespace ElevatorRL.Editor
 
             var id = new RunId
             {
-                runId = $"{DateTime.Now:yyyyMMdd-HHmmss}-{policy}-{preset}",
+                runId = $"{DateTime.Now:yyyyMMdd-HHmmss}-{policy}-{presetName}-{traffic.defaultPattern}-i{traffic.intensity:0.0}-s{seed}",
                 gitSha = "", policy = policy, modelPath = "",
-                buildingPreset = preset, configHash = "", trafficPreset = "inline",
-                pattern = pattern.ToString(), intensity = intensity, seed = seed,
+                buildingPreset = presetName, configHash = "", trafficPreset = "inline",
+                pattern = traffic.defaultPattern.ToString(), intensity = traffic.intensity, seed = seed,
             };
 
             var episode = col.Finish(id);
@@ -155,20 +440,22 @@ namespace ElevatorRL.Editor
             var windowRows = col.BuildWindowStats(id);
             col.Dispose();
 
-            // write CSVs to <project>/Runs/<runId>/
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string runDir = Path.Combine(projectRoot, "Runs", id.runId);
 
-            StatsCsv.Write(Path.Combine(runDir, "episode.csv"),
-                EpisodeStats.Header, new List<string> { episode.ToCsv() });
+            if (!quiet)
+            {
+                StatsCsv.Write(Path.Combine(runDir, "episode.csv"),
+                    EpisodeStats.Header, new List<string> { episode.ToCsv() });
 
-            var floorLines = new List<string>(floorsRows.Count);
-            foreach (var fs in floorsRows) floorLines.Add(fs.ToCsv());
-            StatsCsv.Write(Path.Combine(runDir, "floor_stats.csv"), FloorStats.Header, floorLines);
+                var floorLines = new List<string>(floorsRows.Count);
+                foreach (var fs in floorsRows) floorLines.Add(fs.ToCsv());
+                StatsCsv.Write(Path.Combine(runDir, "floor_stats.csv"), FloorStats.Header, floorLines);
 
-            var winLines = new List<string>(windowRows.Count);
-            foreach (var ws in windowRows) winLines.Add(ws.ToCsv());
-            StatsCsv.Write(Path.Combine(runDir, "window_stats.csv"), WindowStats.Header, winLines);
+                var winLines = new List<string>(windowRows.Count);
+                foreach (var ws in windowRows) winLines.Add(ws.ToCsv());
+                StatsCsv.Write(Path.Combine(runDir, "window_stats.csv"), WindowStats.Header, winLines);
+            }
 
             return (episode, runDir);
         }

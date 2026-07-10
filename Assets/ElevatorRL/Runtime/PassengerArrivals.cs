@@ -10,6 +10,19 @@ namespace ElevatorRL
     /// </summary>
     public sealed class PassengerArrivals
     {
+        /// <summary>
+        /// Building size the base per-floor lambda constants below were tuned for (the "S" scale-
+        /// ladder rung, EXPERIMENT_PLAN.md §3). Non-hub floors' rates don't need scaling as floor
+        /// count changes — summed across MORE floors, their total already grows proportionally.
+        /// But a single-point HUB floor (the lobby under UpPeak/Lunch; the top floor under Lunch)
+        /// is one absolute rate representing aggregate traffic funneled through/to one point, and
+        /// does NOT automatically grow just because the building added floors elsewhere — without
+        /// explicit scaling, taller buildings become dramatically over-saturated at hub floors
+        /// relative to shorter ones at the "same" intensity (observed: Z/H rungs hit 60-69%
+        /// abandonment at intensity=0.5 while S/M/L stayed under 20%, purely from this).
+        /// </summary>
+        public const int ReferenceFloors = 8;
+
         public readonly int floors;
         public float[] lambda;        // arrivals per second, per floor
         public float[][] destDist;    // destDist[origin][dest]
@@ -54,16 +67,20 @@ namespace ElevatorRL
         public void LoadPattern(TrafficPattern p)
         {
             int NF = floors, top = NF - 1;
+            float hubScale = NF / (float)ReferenceFloors;
 
             // ---- per-floor arrival rates (arrivals / second) ----
+            // hubScale applies ONLY to floors that are a single-point aggregate hub in this
+            // pattern (see ReferenceFloors remarks); DownPeak's lambda[0] is deliberately left
+            // unscaled — the lobby is a destination there (via destDist), not an origination hub.
             switch (p)
             {
                 case TrafficPattern.UpPeak:
-                    Fill(lambda, 0.05f); lambda[0] = 0.9f; break;
+                    Fill(lambda, 0.05f); lambda[0] = 0.9f * hubScale; break;
                 case TrafficPattern.DownPeak:
                     Fill(lambda, 0.22f); lambda[0] = 0.04f; break;
                 case TrafficPattern.Lunch:
-                    Fill(lambda, 0.10f); lambda[0] = 0.5f; lambda[top] = 0.45f; break;
+                    Fill(lambda, 0.10f); lambda[0] = 0.5f * hubScale; lambda[top] = 0.45f * hubScale; break;
                 case TrafficPattern.Midday:
                     Fill(lambda, 0.15f); break;
                 default: // Uniform

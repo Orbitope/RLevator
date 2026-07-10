@@ -66,18 +66,41 @@ Two variants, both implemented (`new EtaHeuristic(numElevators, weightByQueueDep
 - **`ETA-Weighted` (`weightByQueueDepth=true`):** processes calls in descending queue-size order
   first, so the busiest call claims the best available car before smaller ones compete.
 
-**Documented finding (paired, same seed, 8fl/3cars/UpPeak/intensity=0.5, 2026-07-09):** pure ETA
-is essentially a wash vs. LOOK in aggregate (waitMean/P95 within ~1-3%) but **not** in the
-breakdown: it cut wait *p95* by 20–43% on mid-building floors (4–6) while **increasing lobby
-(floor 0) abandonment by ~52–150%**. Mechanism: letting busy cars take on extra calls lengthens
-their round trip, so they return to "empty and available" less often — starving the lobby, by far
-the highest-volume origin under up-peak, in favor of nearer but sparser calls. This is a real,
-citable limitation of naive ETA (motivates load-aware dispatch in production systems) and — more
-importantly — **direct evidence for why the per-floor/per-window breakdowns in
-[STATS_VIZ_REPLAY_PLAN.md](STATS_VIZ_REPLAY_PLAN.md) §1.2/§1.3 are load-bearing**: the episode
-aggregate alone reports "roughly a tie," completely hiding the trade-off. Queue-depth weighting is
-the mechanism expected to fix this (untested as of this writing — run the comparison in
-`EvalHarness` to confirm before relying on `ETA-Weighted` as "the" strong baseline).
+**Documented finding 1 — the lobby/mid-building trade-off (paired, same seed, 8fl/3cars/UpPeak,
+intensity=0.5, 2026-07-09):** pure ETA is essentially a wash vs. LOOK in aggregate (waitMean/P95
+within ~1-3%) but **not** in the breakdown: it cut wait *p95* by 20–43% on mid-building floors
+(4–6) while **increasing lobby (floor 0) abandonment by ~52–150%**. Mechanism: letting busy cars
+take on extra calls lengthens their round trip, so they return to "empty and available" less
+often — starving the lobby, by far the highest-volume origin under up-peak, in favor of nearer but
+sparser calls. This is a real, citable limitation of naive ETA (motivates load-aware dispatch in
+production systems) and — more importantly — **direct evidence for why the per-floor/per-window
+breakdowns in [STATS_VIZ_REPLAY_PLAN.md](STATS_VIZ_REPLAY_PLAN.md) §1.2/§1.3 are load-bearing**:
+the episode aggregate alone reports "roughly a tie," completely hiding the trade-off.
+
+**Documented finding 2 — queue-depth weighting is a no-op under sticky assignment (tested across
+the full calibrated S/M/L/Z/H × UpPeak/Lunch × {0.5,1,1.5}× sweep, 90 cells, 2026-07-09):**
+`ETA-Weighted` produced **bit-identical results to pure `ETA` in every single cell** — 0/30
+(preset×pattern×multiple) triples differ, at building sizes from 8 to 40 floors. Mechanism:
+weighting only changes the *processing order* of calls that are simultaneously unclaimed in the
+same decision, but under sticky assignment a claimed call only re-enters contention once its floor
+is fully served — which happens one floor at a time, not synchronized across floors — so two
+different floors genuinely competing for the same single best-fit car essentially never coincides,
+at any scale tested. This is a structural property of the sticky-claim design, not a scenario-
+specific coincidence (see the two single-rung checks that first surfaced it, both also null,
+before the full sweep confirmed it holds everywhere). **Implication:** a version that periodically
+re-evaluates ALL calls (not just newly-freed ones) might let weighting matter, at the cost of
+reintroducing the thrashing stickiness was built to prevent — an explicit trade-off, not yet built.
+Until/unless that's revisited, treat `ETA` and `ETA-Weighted` as the same baseline in practice.
+
+**Documented finding 3 — LOOK is more robust than ETA specifically under zoning.** At a matched
+~10%-abandonment calibration point (see §3), LOOK edges out ETA more clearly at Z/H (zoned) than
+at S/M/L (unzoned) — e.g. UpPeak abandonRate: S 0.102→0.098 (ETA slightly better), M 0.098→0.092
+(ETA slightly better), L 0.100→0.112 (LOOK better), **Z 0.157→0.206, H 0.239→0.295 (LOOK clearly
+better)**. This is the opposite direction from finding 1's "ETA wins mid-building, loses lobby" —
+under zoning, ETA's willingness to send busy cars on long detours to new calls appears to interact
+badly with cross-zone travel distance specifically, whereas LOOK's more conservative "only
+reassign empty cars" rule is comparatively more robust. Caveat: only 1-2 seeds so far per cell —
+treat as a lead to confirm with more seeds, not yet a settled result.
 
 **Still optional / not yet built:**
 - **Zoned LOOK:** static sectoring under up-peak (assign cars to floor bands). Cheap to add if the
@@ -128,26 +151,78 @@ as a checklist; several are one-liners but materially affect learnability.
 
 ---
 
-## 3. The scale ladder (environment configurations)
+## 3. The scale ladder (environment configurations) — IMPLEMENTED
 
-The core independent variable is **problem difficulty**, dialed along four axes. Define a small
-set of named `BuildingConfig` presets so every experiment references a rung, not ad-hoc numbers.
+Five `BuildingConfig` preset assets at `Assets/ElevatorRL/Config/Presets/` (generate/regenerate
+via **Tools ▸ Elevator RL ▸ Generate Scale Ladder Presets**), plus a sixth for E7 only:
 
-| Rung | Floors | Cars | Restrictions | Purpose |
+| Rung | Floors | Cars | Zoning (`floorRange`, all nested at floor 0 — see note) | Fleet |
 |---|---|---|---|---|
-| **S — Small** | 8 | 3 | none (all cars serve all floors) | Sanity / parity regime. Expect RL ≈ LOOK. |
-| **M — Mid** | 16 | 5 | none | First scale step; nearest-car starts to fray. |
-| **L — Large** | 30 | 8 | none | Tall building; anticipation & horizon matter. |
-| **Z — Zoned** | 30 | 8 | 2–3 banks via `floorRange` (low-rise / high-rise / overlap) | The constraint regime — LOOK's per-car myopia should hurt most. |
-| **H — Heterogeneous** | 40 | 10 | banks + variable in-service fleet (`randomizeActive`) + mid-episode service changes | The full "messy real building" — the target regime for the thesis. |
+| **S — Small** | 8 | 3 | none | fixed |
+| **M — Mid** | 16 | 5 | none | fixed |
+| **L — Large** | 30 | 8 | none | fixed |
+| **Z — Zoned** | 30 | 8 | low 2 cars (0–14) / mid 3 cars (0–22) / high 3 cars (0–29) | fixed |
+| **H — Heterogeneous** | 40 | 10 | low 3 cars (0–15) / mid 3 cars (0–28) / high 4 cars (0–39) | fixed |
+| **H_VarFleet** (E7 only) | 40 | 10 | same as H | `randomizeActive`, min 5, service-change 0.02 |
 
-Traffic axis (crossed with rungs where affordable): `TrafficPattern ∈ {UpPeak, DownPeak, Lunch,
-Midday, Uniform}` × `intensity ∈ {0.5, 1.0, 1.5, 2.0}`. RL's edge should be largest at **UpPeak
-and intensity ≥ 1.5** (heaviest, most directional — where zoning/anticipation pay off).
+**Nested, not partitioned, zoning:** `BuildingConfig.floorRange` is a single contiguous `[min,max]`
+per car, and since virtually all traffic originates or terminates at the lobby (floor 0), every
+car's range starts there — a car excluding floor 0 could never serve lobby-bound/lobby-origin
+riders and would permanently strand anyone whose only eligible cars were such a car. Nesting still
+creates real scarcity (only high-rise cars ever reach the top) without that failure mode — a
+common real design (all banks reach the sky lobby; only some continue further up).
+
+**Car allocation is weighted toward high-rise, not even.** An initial even-ish split (Z 3/3/2, H
+4/4/2) left the top-exclusive band structurally under-capacity: 34–68% abandonment even at the
+lowest intensity tested, with LOOK/ETA/ETA-Weighted all failing identically — a system that far
+past capacity gives no assignment-quality signal at all (nothing to differentiate dispatchers).
+Root cause: a handful of full-range "high-rise" cars aren't actually *reserved* for the top floors
+— they're generalists competing for abundant nearby lower-floor calls too, so the rare, distant,
+long-round-trip (~90–150s) top-floor demand chronically starves under any greedy dispatch. Z/H's
+current 2/3/3 and 3/3/4 splits fixed this (see §1.2 finding 3 for the resulting LOOK vs. ETA
+numbers) — confirmed by calibration landing on genuine interior crossing points (below) rather
+than pinning at a search-range floor.
+
+**H_VarFleet is split out from H.** H originally also carried `randomizeActive`/
+`serviceChangeProbability` (variable fleet), but a randomly-selected out-of-service subset isn't
+zone-aware — an unlucky draw could gut a specific zone's capacity entirely, and abandonment doesn't
+average out gracefully once queues blow past `maxWait` (this made H uncalibratable at *any*
+intensity: 26% abandonment even near-zero load). Variable-fleet robustness (E7) and scale/zoning
+saturation (E1/E3/E4) are different questions — H is now fixed-fleet like S/M/L/Z; `H_VarFleet` is
+the same topology/zoning with variable fleet enabled, for E7 exclusively, run at a fixed,
+comfortably-below-saturation intensity (not the calibration approach below).
+
+### Intensity: calibrated per (rung, pattern), not a flat shared value
+
+Two problems with using one flat `intensity` across all rungs, both found and fixed 2026-07-09:
+
+1. **`PassengerArrivals` hub-floor rates don't scale with building size.** Per-floor rates
+   naturally scale in total as floor count grows (more floors summed), but a single-point
+   aggregate hub (the lobby under UpPeak/Lunch; the top floor under Lunch) is one absolute rate
+   that doesn't grow just because the building added floors elsewhere. **Fixed:** hub floors now
+   scale by `numFloors / ReferenceFloors` (8, the S rung) — S is unaffected; taller buildings get
+   proportionally more hub traffic. DownPeak's `lambda[0]` is deliberately left unscaled (the
+   lobby is a destination there, not an origination hub).
+2. **Even after that fix, capacity-per-unit-intensity differs enormously by rung** (zoning and
+   sheer floor count both matter). A flat intensity value that's comfortable for S is either
+   trivial or catastrophic elsewhere.
+
+**Fix: bisection calibration against LOOK, per (preset, pattern).** `EvalHarness.CalibrateIntensity`
+finds the intensity where LOOK's `abandonRate ≈ 10%`, then the real sweep evaluates all policies at
+{0.5×, 1.0×, 1.5×} of that calibrated base. Menu: **Tools ▸ Elevator RL ▸ Run E1 Sweep - Calibrated**.
+Confirmed calibrated bases (UpPeak, 2026-07-09, single seed): S≈1.33, M≈0.41, L≈0.29, **Z≈0.017,
+H≈0.009** — Z/H need dramatically less nominal intensity to reach the same *relative* saturation,
+which is itself informative: zoning reduces effective capacity per unit of demand far more than
+the raw floor/car counts alone would suggest.
+
+Traffic axis (crossed with rungs): `TrafficPattern ∈ {UpPeak, DownPeak, Lunch, Midday, Uniform}` —
+currently sweeping UpPeak + Lunch; DownPeak/Midday/Uniform not yet run at full ladder scale.
+RL's edge should be largest at **UpPeak, high multiple** (heaviest, most directional — where
+zoning/anticipation pay off).
 
 > Floor restrictions are already supported: `BuildingConfig.floorRange` (`Vector2Int[]` per car)
-> and `MinFloor/MaxFloor`; LOOK honors them (heuristic line 50) and actions are masked to range
-> (`WriteDiscreteActionMask`). Zoned/heterogeneous experiments need config assets, not new code.
+> and `MinFloor/MaxFloor`; LOOK and ETA both honor them, and actions are masked to range
+> (`WriteDiscreteActionMask`).
 
 ---
 
@@ -304,9 +379,11 @@ the M1/M2 milestones below.
 
 ## 8. Milestones
 
-1. **M0 — Baseline surface (E1).** No training. Produces the yardstick + first thesis evidence.
-   *(Instrumentation + LOOK/ETA/ETA-Weighted baselines are implemented; the full sweep across
-   rungs/patterns/intensities is the remaining work.)*
+1. **M0 — Baseline surface (E1) — DONE for UpPeak/Lunch.** Instrumentation, all three baselines,
+   the five (six w/ H_VarFleet) scale-ladder presets, and calibrated sweep infrastructure are
+   implemented and producing real data (§1.2 findings 1–3; §3 calibrated intensities). Remaining:
+   more seeds per cell (currently 1-2), DownPeak/Midday/Uniform patterns, and committing the
+   sweep-runner code + this doc's findings.
 2. **M1 — Trainable setup (E2).** Apply remaining §2 fixes (truncation, horizon/γ, wait-age obs);
    PPO matches LOOK on rung S. Gate: parity.
 3. **M2 — Scale curve (E3).** Train/eval across S→H; produce the gap-vs-rung headline figure.

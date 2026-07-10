@@ -20,6 +20,7 @@ namespace ElevatorRL.Editor
     public static class ElevatorSetup
     {
         const string AssetFolder   = "Assets/ElevatorRL/Config";
+        const string PresetFolder  = "Assets/ElevatorRL/Config/Presets";
         const string FontFolder    = "Assets/ElevatorRL/UI/Fonts";
         const string SandboxScene  = "Assets/Scenes/ElevatorSandbox.unity";
         const string ThemePath     = "Packages/com.mwburke.contentkit/ScriptableObjects/CKDefaultTheme.asset";
@@ -93,6 +94,94 @@ namespace ElevatorRL.Editor
             AssetDatabase.CreateAsset(asset, path);
             AssetDatabase.SaveAssets();
             return asset;
+        }
+
+        // ── Scale-ladder presets (EXPERIMENT_PLAN.md §3) ───────────────────────
+
+        /// <summary>
+        /// Generates the five scale-ladder BuildingConfig presets (S/M/L/Z/H). Z and H use
+        /// NESTED (not partitioned) floor ranges — every car's range starts at floor 0 — because
+        /// BuildingConfig.floorRange is a single contiguous [min,max] per car, and virtually all
+        /// traffic originates or terminates at the lobby (floor 0): a car whose range excluded it
+        /// could never serve lobby-bound/lobby-origin riders, permanently stranding anyone whose
+        /// only eligible cars were such a car. Nesting still creates real scarcity — only the
+        /// high-rise cars ever reach the top floors — without that failure mode. This mirrors a
+        /// common real design (all banks reach the sky lobby; only some continue further up).
+        /// </summary>
+        [MenuItem("Tools/Elevator RL/Generate Scale Ladder Presets (S-M-L-Z-H)")]
+        static void GenerateScaleLadderPresets()
+        {
+            EnsureFolder(PresetFolder);
+
+            CreatePreset("S_BuildingConfig", floors: 8, cars: 3, capacity: 8, floorRange: null);
+            CreatePreset("M_BuildingConfig", floors: 16, cars: 5, capacity: 8, floorRange: null);
+            CreatePreset("L_BuildingConfig", floors: 30, cars: 8, capacity: 8, floorRange: null);
+
+            // Z — zoned, fixed fleet: low-rise (2 cars, 0-14), mid-rise (3 cars, 0-22),
+            // high-rise (3 cars, 0-29, full range). Weighted toward high-rise: the top-exclusive
+            // band (floors 23-29) is only reachable by the high-rise cars and its round trip is
+            // long (~90-150s at floorTravelTime=1.6s), so it needs real dedicated capacity — an
+            // earlier 3/3/2 split left that band structurally under-capacity (34-68% abandonment
+            // even at very low overall intensity, since only 2 cars could ever reach it and they
+            // weren't exclusive to it besides).
+            var zRange = new Vector2Int[8];
+            for (int i = 0; i < 2; i++) zRange[i] = new Vector2Int(0, 14);
+            for (int i = 2; i < 5; i++) zRange[i] = new Vector2Int(0, 22);
+            for (int i = 5; i < 8; i++) zRange[i] = new Vector2Int(0, 29);
+            CreatePreset("Z_BuildingConfig", floors: 30, cars: 8, capacity: 8, floorRange: zRange);
+
+            // H — zoned, FIXED fleet: low-rise (3 cars, 0-15), mid-rise (3 cars, 0-28),
+            // high-rise/express (4 cars, 0-39, full range). Same high-rise-weighted rationale as
+            // Z, scaled up (top-exclusive band is floors 29-39). Fixed fleet so H sits on the same
+            // saturation-calibration footing as S/M/L/Z for E1/E3/E4 (scale + zoning).
+            //
+            // NOTE: H previously ALSO carried randomizeActive/serviceChangeProbability (variable
+            // fleet) — but a randomly-selected out-of-service subset isn't zone-aware, so an
+            // unlucky draw could gut a specific zone's capacity entirely, and abandonment doesn't
+            // average out gracefully once queues blow past maxWait — this made H uncalibratable
+            // at ANY intensity (26% abandonment even near-zero load). Variable fleet + zoning
+            // together is a real, separate robustness question (E7), not the same axis as
+            // saturation vs. scale/zoning (E1/E3/E4) — split into its own preset below so each
+            // experiment tests one thing at a time.
+            var hRange = new Vector2Int[10];
+            for (int i = 0; i < 3; i++) hRange[i] = new Vector2Int(0, 15);
+            for (int i = 3; i < 6; i++) hRange[i] = new Vector2Int(0, 28);
+            for (int i = 6; i < 10; i++) hRange[i] = new Vector2Int(0, 39);
+            CreatePreset("H_BuildingConfig", floors: 40, cars: 10, capacity: 8, floorRange: hRange);
+
+            // H_VarFleet — E7 ONLY (fleet-size generalization/robustness): identical topology and
+            // zoning to H, but with randomizeActive + mid-episode service changes turned on. Run
+            // this at a fixed, comfortably-below-saturation intensity (well under H's own
+            // calibrated base) — the point is measuring graceful degradation as active fleet size
+            // varies, not finding another saturation curve.
+            CreatePreset("H_VarFleet_BuildingConfig", floors: 40, cars: 10, capacity: 8, floorRange: hRange,
+                randomizeActive: true, minActive: 5, serviceChangeProb: 0.02f);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[ElevatorRL] Generated scale ladder presets (S/M/L/Z/H) at " + PresetFolder);
+        }
+
+        static BuildingConfig CreatePreset(string name, int floors, int cars, int capacity,
+            Vector2Int[] floorRange, bool randomizeActive = false, int minActive = 1,
+            float serviceChangeProb = 0f)
+        {
+            string path = $"{PresetFolder}/{name}.asset";
+            var cfg = AssetDatabase.LoadAssetAtPath<BuildingConfig>(path);
+            bool isNew = cfg == null;
+            if (isNew) cfg = ScriptableObject.CreateInstance<BuildingConfig>();
+
+            cfg.numFloors = floors;
+            cfg.numElevators = cars;
+            cfg.capacity = capacity;
+            cfg.floorRange = floorRange;
+            cfg.randomizeActive = randomizeActive;
+            cfg.minActiveElevators = minActive;
+            cfg.serviceChangeProbability = serviceChangeProb;
+
+            if (isNew) AssetDatabase.CreateAsset(cfg, path);
+            else EditorUtility.SetDirty(cfg);
+            return cfg;
         }
 
         // ── Sandbox Scene setup ────────────────────────────────────────────────
