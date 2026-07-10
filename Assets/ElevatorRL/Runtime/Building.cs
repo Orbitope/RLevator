@@ -375,6 +375,7 @@ namespace ElevatorRL
             if (obs.carActive) s += E;
             if (obs.carButtons) s += E * F;
             if (obs.hallButtons) s += 2 * F;
+            if (obs.hallCallAge) s += 2 * F;
             if (obs.carMotion) s += 4 * E;
             if (obs.carLoads) s += E;
             if (obs.queueLengths) s += 2 * F;
@@ -412,6 +413,13 @@ namespace ElevatorRL
                     sensor.AddObservation(downQ[f].Count > 0 ? 1f : 0f);
                 }
 
+            if (obs.hallCallAge)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(OldestWaitFrac(upQ[f]));
+                    sensor.AddObservation(OldestWaitFrac(downQ[f]));
+                }
+
             if (obs.carMotion)
                 for (int i = 0; i < E; i++)
                 {
@@ -444,6 +452,15 @@ namespace ElevatorRL
 
             if (obs.pattern)
                 sensor.AddOneHotObservation((int)ActivePattern, 5);
+        }
+
+        /// <summary>Longest current wait in a hall queue, normalized by maxWait (0 if empty).</summary>
+        float OldestWaitFrac(List<Passenger> q)
+        {
+            if (q.Count == 0) return 0f;
+            float maxW = 0f;
+            for (int i = 0; i < q.Count; i++) if (q[i].waitTime > maxW) maxW = q[i].waitTime;
+            return Mathf.Clamp01(maxW / cfg.maxWait);
         }
     }
 }

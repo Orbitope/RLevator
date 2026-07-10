@@ -115,7 +115,11 @@ namespace ElevatorRL
             AddReward(_b.CollectReward());
 
             _decisions++;
-            if (episodeDecisionLimit > 0 && _decisions >= episodeDecisionLimit) EndEpisode();
+            // This is a continuing task with no genuine terminal state — the decision-limit
+            // cutoff is a truncation, not a termination. EndEpisode() would tell PPO the final
+            // state's value is 0 (false) and bias the value function at exactly the truncation
+            // states; EpisodeInterrupted() correctly bootstraps the value instead.
+            if (episodeDecisionLimit > 0 && _decisions >= episodeDecisionLimit) EpisodeInterrupted();
         }
 
         public override void WriteDiscreteActionMask(IDiscreteActionMask mask)

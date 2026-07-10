@@ -113,20 +113,18 @@ treat as a lead to confirm with more seeds, not yet a settled result.
 These are correctness/efficiency items found in review of the current `Runtime/` code. Track them
 as a checklist; several are one-liners but materially affect learnability.
 
-- [ ] **Truncation vs. termination.** `ElevatorControllerAgent.OnActionReceived` calls
-  `EndEpisode()` at `episodeDecisionLimit`. This is a *continuing* task with no terminal state;
-  `EndEpisode()` tells PPO the final-state value is 0 (false) and biases the value function at
-  exactly the truncation states. Use `EpisodeInterrupted()` (bootstraps the value) for the
-  step-limit cutoff; reserve `EndEpisode()` for genuine terminals (none here).
-- [ ] **Discount / horizon for a 0.5 s decision cadence.** γ=0.99 ⇒ ~50 s effective horizon ≈ one
-  round trip in a small building — too short once buildings get tall. Plan to sweep **γ ∈ {0.99,
-  0.995, 0.999}** and raise `time_horizon` (128 → 256–512). Delivered reward lands dozens of
-  masked-NOOP decisions after the pivotal choice; credit assignment needs the longer horizon.
-- [ ] **Observe wait, not just presence.** Reward penalizes `queueSeconds` and `abandoned`, but
-  observations carry only queue *lengths* and binary hall buttons — the policy can't see that a
-  floor is about to abandon (−8 incoming). Add an obs block: **normalized age of the oldest hall
-  call per floor** (up/down), `min(1, oldestWait / maxWait)`. Real ETA controllers track this.
-  Make it a toggle in `ObservationConfig` so it's also an ablation.
+- [x] **Truncation vs. termination — DONE (M1).** `ElevatorControllerAgent.OnActionReceived`
+  now calls `EpisodeInterrupted()` (bootstraps the value) at `episodeDecisionLimit` instead of
+  `EndEpisode()` (which would tell PPO the final-state value is 0 — false for this continuing
+  task, and biases the value function at exactly the truncation states).
+- [x] **Discount / horizon — DONE (M1), default only.** `config/elevator_ppo.yaml`:
+  `gamma: 0.99→0.995`, `time_horizon: 128→256`. This is the sweep's middle default, not a
+  validated final choice — still sweep **γ ∈ {0.99, 0.995, 0.999}** once training starts.
+- [x] **Observe wait, not just presence — DONE (M1).** Added `ObservationConfig.hallCallAge`
+  (default **on**) + `Building.ObservationSize/WriteObservation`: normalized age of the
+  longest-waiting rider per hall queue (up/down per floor), `Mathf.Clamp01(maxWait_in_queue /
+  cfg.maxWait)`, via new `Building.OldestWaitFrac`. Toggle off for the "realistic, no wait-age"
+  ablation arm (E5).
 - [ ] **Per-car weight sharing (architecture).** Current obs is per-car one-hot blocks + a flat
   MLP: the network must relearn the same logic `numElevators` times, with no sharing, and it's
   sensitive to car ordering. This is the single biggest scalability limiter. Plan a **shared
@@ -384,8 +382,10 @@ the M1/M2 milestones below.
    implemented and producing real data (§1.2 findings 1–3; §3 calibrated intensities). Remaining:
    more seeds per cell (currently 1-2), DownPeak/Midday/Uniform patterns, and committing the
    sweep-runner code + this doc's findings.
-2. **M1 — Trainable setup (E2).** Apply remaining §2 fixes (truncation, horizon/γ, wait-age obs);
-   PPO matches LOOK on rung S. Gate: parity.
+2. **M1 — Trainable setup (E2) — code fixes DONE, training/parity not yet run.** §2's truncation,
+   horizon/γ default, and wait-age observation are all applied. Remaining: actually train PPO on
+   rung S and confirm it matches LOOK (the parity gate) — needs `mlagents-learn` installed/run,
+   not yet done.
 3. **M2 — Scale curve (E3).** Train/eval across S→H; produce the gap-vs-rung headline figure.
 4. **M3 — Zoning + obs (E4, E5).** The thesis core + cheap ablations.
 5. **M4 — Architecture + generalization (E6, E7).** Unlock large fleets; one-policy-many-fleets.

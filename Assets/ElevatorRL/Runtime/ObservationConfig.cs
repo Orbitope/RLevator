@@ -17,6 +17,13 @@ namespace ElevatorRL
         public bool carActive = true;    // E   (1 = in service / present)
         public bool carButtons = true;   // E x F  (destination buttons pressed)
         public bool hallButtons = true;  // 2F  (up/down hall lamps)
+        [Tooltip("Normalized age (waitTime/maxWait, clamped) of the LONGEST-waiting rider per " +
+            "hall queue, up/down per floor. Without this the policy can see THAT a floor has a " +
+            "call but not how close it is to abandoning (-8 reward) — real ETA controllers track " +
+            "this. Real hall buttons don't report exact wait either, but this is the one piece of " +
+            "\"realistic\" info a controller plausibly could infer/log, so it's grouped with the " +
+            "other limited-observability blocks above rather than under full observability.")]
+        public bool hallCallAge = true;  // 2F  (oldest wait per queue, up/down)
 
         [Header("Continuous-time additions (recommended)")]
         public bool carMotion = true;    // E x (dir one-hot[3] + normalized position)

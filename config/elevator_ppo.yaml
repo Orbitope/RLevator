@@ -19,11 +19,18 @@ behaviors:
       normalize: true         # important - observation blocks vary in scale
     reward_signals:
       extrinsic:
-        gamma: 0.99
+        # gamma=0.99 gives a ~50s effective horizon at this env's 0.5s decision cadence — roughly
+        # one round trip in a small building, too short once buildings get tall (delivered reward
+        # lands many masked-NOOP decisions after the pivotal choice). 0.995 ~doubles the effective
+        # horizon to ~200s; EXPERIMENT_PLAN.md §2 calls for sweeping {0.99, 0.995, 0.999} — this is
+        # the sweep's middle default, not a final answer.
+        gamma: 0.995
         strength: 1.0
     keep_checkpoints: 5
     max_steps: 5.0e6
-    time_horizon: 128
+    # doubled from 128 alongside gamma, for the same reason — a longer discount horizon needs a
+    # long enough rollout window (time_horizon) for GAE to actually see that far.
+    time_horizon: 256
     summary_freq: 20000
 
 # ----------------------------------------------------------------------------
