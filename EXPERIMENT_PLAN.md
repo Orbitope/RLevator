@@ -36,9 +36,10 @@ a curve (gap vs. building size / #zones / traffic intensity), not a single numbe
 
 ---
 
-## 1. Baseline: collective LOOK + nearest-car (already implemented)
+## 1. Baselines (three implemented)
 
-`ElevatorHeuristics.CollectiveLook(Building)` — three passes per decision:
+### 1.1 LOOK + nearest-car — `ElevatorHeuristics.CollectiveLook(Building)`
+Three passes per decision:
 1. **Rider LOOK:** each occupied car targets the nearest desired floor *ahead in its current
    direction* (no mid-trip reversal).
 2. **Nearest-car dispatch:** each empty idle car greedily claims the nearest unclaimed floor with
@@ -48,11 +49,39 @@ a curve (gap vs. building size / #zones / traffic intensity), not a single numbe
 Use it three ways: (a) headline baseline for every experiment, (b) demonstration source for
 optional BC/GAIL warm-start, (c) the sandbox dispatcher for the dashboard.
 
-**Optional stronger baselines** (to make an RL win meaningful, not just "beat the weakest thing"):
-- **Zoned LOOK:** static sectoring under up-peak (assign cars to floor bands). Cheap to add.
-- **Estimated-Time-of-Arrival (ETA) dispatch:** assign each hall call to the car with least
-  estimated marginal delay (the core of real ETA/ETD controllers). This is the honest bar for a
-  "scale" claim — if RL beats nearest-car but not ETA, say so.
+### 1.2 ETA/ETD — `EtaHeuristic` (stateful, one instance per episode)
+The honest strong bar: unlike LOOK, which only ever reassigns *idle, empty* cars to new hall
+calls, `EtaHeuristic` lets **any** in-service car — busy or not — claim a new call if its
+estimated arrival time beats every other car's, given that car's onboard riders' destinations and
+its other already-committed calls (a one-reversal scan-time estimate: continue the current sweep
+to the farthest committed stop, reverse if needed, travel to the call, paying a stop penalty —
+`doorTime*2 + dwellTime` — per intermediate committed stop). Assignments are **sticky**: a claimed
+call stays with its car until served or the car leaves service, matching real destination-dispatch
+systems (needed because a car only moves one floor per decision and re-derives everything from
+scratch each tick — without stickiness, calls thrash between cars).
+
+Two variants, both implemented (`new EtaHeuristic(numElevators, weightByQueueDepth: bool)`):
+- **`ETA` (pure, `weightByQueueDepth=false`):** processes hall calls in floor-index order,
+  assigning each independently to its lowest-ETA car.
+- **`ETA-Weighted` (`weightByQueueDepth=true`):** processes calls in descending queue-size order
+  first, so the busiest call claims the best available car before smaller ones compete.
+
+**Documented finding (paired, same seed, 8fl/3cars/UpPeak/intensity=0.5, 2026-07-09):** pure ETA
+is essentially a wash vs. LOOK in aggregate (waitMean/P95 within ~1-3%) but **not** in the
+breakdown: it cut wait *p95* by 20–43% on mid-building floors (4–6) while **increasing lobby
+(floor 0) abandonment by ~52–150%**. Mechanism: letting busy cars take on extra calls lengthens
+their round trip, so they return to "empty and available" less often — starving the lobby, by far
+the highest-volume origin under up-peak, in favor of nearer but sparser calls. This is a real,
+citable limitation of naive ETA (motivates load-aware dispatch in production systems) and — more
+importantly — **direct evidence for why the per-floor/per-window breakdowns in
+[STATS_VIZ_REPLAY_PLAN.md](STATS_VIZ_REPLAY_PLAN.md) §1.2/§1.3 are load-bearing**: the episode
+aggregate alone reports "roughly a tie," completely hiding the trade-off. Queue-depth weighting is
+the mechanism expected to fix this (untested as of this writing — run the comparison in
+`EvalHarness` to confirm before relying on `ETA-Weighted` as "the" strong baseline).
+
+**Still optional / not yet built:**
+- **Zoned LOOK:** static sectoring under up-peak (assign cars to floor bands). Cheap to add if the
+  zoning experiments (E4) want a heuristic-with-zoning-awareness comparator beyond range-aware LOOK.
 
 ---
 
@@ -82,8 +111,20 @@ as a checklist; several are one-liners but materially affect learnability.
   explicit architecture variant (§6). Keep the flat MLP as the baseline arm.
 - [ ] **Reward normalization / scale.** `delivered=+10` is large and sparse vs. dense per-second
   penalties; with `normalize: true` already set, still verify value-loss isn't dominated by the
-  delivery spikes. Consider logging the per-term reward decomposition (the `Acc` struct already
-  separates them) to a custom TensorBoard stat.
+  delivery spikes.
+- [x] **Reward decomposition logging — DONE (M0).** `Building` now accumulates lifetime
+  `Rw{Total,Delivered,Toward,Away,Rejected,Abandoned,InElevator,InQueue}`; `StatsCollector`/
+  `EpisodeStats` surface the per-episode decomposition to CSV. Wire the same fields into
+  ML-Agents' `StatsRecorder` for TensorBoard once training starts (STATS_VIZ_REPLAY_PLAN.md §5).
+- [x] **Wasted fully-masked decisions — DONE.** `ElevatorControllerAgent.FixedUpdate` called
+  `RequestDecision()` on every fixed `decisionInterval` tick regardless of car state; with
+  `floorTravelTime` (1.6s) several times `decisionInterval` (0.5s), most ticks had every car
+  mid-travel/door-cycle (all 5 non-NOOP actions masked for every car) — a wasted `OnActionReceived`
+  round-trip. Fixed: skip `RequestDecision()` when no in-service car is `AtFloor`. Note this only
+  removes wasted decisions, not the up-to-`decisionInterval` latency between a car becoming idle
+  and the policy next acting on it (true event-driven decisions would remove that too — see §7
+  below, this is the same granularity question, one level up). Also means
+  `episodeDecisionLimit` now corresponds to a fleet/traffic-dependent amount of sim time.
 
 ---
 
@@ -168,6 +209,21 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Pattern transfer:** train on one pattern, test on another (up→down); measure generalization.
 - **BC/GAIL warm-start** from LOOK demonstrations to accelerate E3/E4.
 
+### E9 — Action space granularity: primitive vs. target-floor (semi-MDP)
+- **Q:** Does deciding at "pick a target floor" granularity (options-style; see §7) learn faster
+  and/or reach a better policy than the current one-floor-at-a-time primitive space?
+- **Motivation:** both implemented baselines (LOOK, ETA/ETD) already reason at target-floor
+  granularity internally (`target[]`) and only mechanically translate to primitive steps each
+  tick — evidence that's the natural unit of a *dispatch* decision, and that forcing RL through the
+  primitive interface adds an indirection (re-deriving the same target across several masked/step
+  decisions) that a semi-MDP action space would remove.
+- **Arms:** A-Primitive (current: noop/up/down/board-up/board-down/unload, one branch per car,
+  decided every eligible tick) vs. A-TargetFloor (§7: commit to a target floor, held until arrival
+  or an explicit replan action, decided as an option).
+- **Metric:** sample efficiency (steps/wall-clock to match LOOK) and asymptotic performance, per
+  rung; secondary — does A-TargetFloor's loss of mid-trip redirect flexibility cost anything on
+  Z/H (zoned/heterogeneous), where anticipatory re-routing might matter more?
+
 ---
 
 ## 5. Metrics & reporting
@@ -209,14 +265,55 @@ show whether A0 plateaus.
 
 ---
 
-## 7. Milestones
+## 7. Action space variants (detail for E9)
+
+The environment currently decides at **primitive** granularity: every eligible tick, each car
+picks one of {noop, step up one floor, step down one floor, board-up, board-down, unload}
+(`Building.ApplyAction`, cases 1/2 move exactly one floor; the car re-idles and the full dispatch
+recomputes from scratch). This is a legitimate, complete low-level action set — matches the
+physical constraints exactly, and is what most ML-Agents examples default to — but it is not the
+only reasonable choice, and building the two heuristic baselines surfaced concrete evidence about
+the alternative.
+
+- **AS0 — Primitive (current).** One MultiDiscrete branch (size 6) per car, decided every tick a
+  car is `AtFloor`. Pro: maximal flexibility — a car can be redirected floor-by-floor as new
+  information arrives, no separate "replan" mechanism needed. Con: a single conceptual dispatch
+  decision ("go serve floor 7") is re-derived across every intermediate arrival, spreading credit
+  for one good call across many identical-looking decisions and diluting the learning signal —
+  exactly the mechanism flagged in §2's discount/horizon item.
+- **AS1 — Target-floor (semi-MDP / options).** A car's action is "commit to target floor f"
+  (chosen only when the car is `AtFloor` and has no outstanding commitment); a fixed, deterministic
+  sub-controller (literally the existing `Building.ApplyAction` step/board/unload resolution,
+  reused, not reimplemented) drives the car floor-by-floor toward f without further policy
+  involvement until arrival. The policy is asked for a *new* decision only on arrival (or
+  optionally on an explicit "replan" trigger — e.g., a much higher-priority call has appeared —
+  to avoid completely losing redirection flexibility). Pro: decisions align 1:1 with what LOOK/ETA
+  already treat as the meaningful unit (their own `target[]`), which should sharply cut the
+  effective decision count needed to complete one dispatch and ease credit assignment. Con: a
+  committed car cannot react to new information until arrival unless the replan trigger is added
+  (itself a design choice — what should trigger it, and does it reopen the same thrashing risk
+  seen with `EtaHeuristic`'s early non-sticky prototype in §1.2?).
+
+Both are straightforward to implement given what already exists: AS1's "drive toward a committed
+target" logic is exactly `EtaHeuristic`/`CollectiveLook`'s existing resolve step, just driven by a
+policy-chosen target instead of a heuristically-computed one. Recommended default: build AS0 first
+(already in place), get E2/E3 baseline numbers, then build AS1 and run E9 — don't let this block
+the M1/M2 milestones below.
+
+---
+
+## 8. Milestones
 
 1. **M0 — Baseline surface (E1).** No training. Produces the yardstick + first thesis evidence.
-2. **M1 — Trainable setup (E2).** Apply §2 fixes; PPO matches LOOK on rung S. Gate: parity.
+   *(Instrumentation + LOOK/ETA/ETA-Weighted baselines are implemented; the full sweep across
+   rungs/patterns/intensities is the remaining work.)*
+2. **M1 — Trainable setup (E2).** Apply remaining §2 fixes (truncation, horizon/γ, wait-age obs);
+   PPO matches LOOK on rung S. Gate: parity.
 3. **M2 — Scale curve (E3).** Train/eval across S→H; produce the gap-vs-rung headline figure.
 4. **M3 — Zoning + obs (E4, E5).** The thesis core + cheap ablations.
 5. **M4 — Architecture + generalization (E6, E7).** Unlock large fleets; one-policy-many-fleets.
-6. **M5 — Stretch + write-up (E8).** Fairness, transfer, emergent-strategy visuals.
+6. **M5 — Action space (E9).** Build AS1 (target-floor); compare against AS0.
+7. **M6 — Stretch + write-up (E8).** Fairness, transfer, emergent-strategy visuals.
 
 ---
 

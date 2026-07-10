@@ -76,10 +76,32 @@ namespace ElevatorRL
             {
                 _clock -= buildingConfig.decisionInterval;
                 _b.StepServiceChanges();
-                RequestDecision();
+
+                // Skip the decision entirely if every car is mid-travel/door-cycle (all 5
+                // non-NOOP actions masked for every car this tick) — with floorTravelTime
+                // (1.6s default) several times decisionInterval (0.5s), most fixed-cadence
+                // ticks would otherwise produce a fully-masked, wasted OnActionReceived call.
+                // NOTE: this only removes wasted decisions on ticks with nothing to choose;
+                // it does not remove the up-to-decisionInterval latency between a car actually
+                // becoming idle and the policy next acting on it (that would need fully
+                // event-driven decisions, a bigger change — see EXPERIMENT_PLAN.md action-space
+                // notes). It also means episodeDecisionLimit now corresponds to a fleet/traffic
+                // -dependent amount of sim time, since real decisions fire less often when fewer
+                // cars are actionable.
+                if (AnyCarNeedsDecision()) RequestDecision();
             }
 
             if (view != null) view.Mirror(_b);
+        }
+
+        bool AnyCarNeedsDecision()
+        {
+            for (int i = 0; i < _b.cars.Length; i++)
+            {
+                var c = _b.cars[i];
+                if (c.inService && c.AtFloor) return true;
+            }
+            return false;
         }
 
         public override void CollectObservations(VectorSensor sensor) => _b.WriteObservation(sensor);
