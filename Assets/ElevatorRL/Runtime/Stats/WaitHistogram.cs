@@ -29,6 +29,11 @@ namespace ElevatorRL.Stats
         public float Mean => _n > 0 ? (float)(_sum / _n) : 0f;
         public float Max => _peak;
 
+        // Bin access for distribution export (ECDF / histogram charts).
+        public int BinCount => _bins;
+        public float BinWidth => _binW;
+        public int BinAt(int i) => (i >= 0 && i < _bins) ? _counts[i] : 0;
+
         public float Std
         {
             get

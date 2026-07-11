@@ -103,6 +103,20 @@ namespace ElevatorRL.Editor
                       "(same target logic, slightly different resolve).");
         }
 
+        [MenuItem("Tools/Elevator RL/Generate wait_hist demo (L UpPeak, LOOK+ETA)")]
+        static void GenWaitHistDemo()
+        {
+            var presets = LoadPresets(new[] { "L" });
+            if (presets == null) return;
+            var L = presets["L"];
+            RunWithPreset("LOOK", ElevatorHeuristics.CollectiveLook, "L", L,
+                TrafficPattern.UpPeak, 0.376f, 1, 3600f, 300f, 300f);
+            var eta = new EtaHeuristic(L.numElevators);
+            RunWithPreset("ETA", eta.Dispatch, "L", L,
+                TrafficPattern.UpPeak, 0.376f, 1, 3600f, 300f, 300f);
+            Debug.Log("[Eval] wait_hist demo written — L / UpPeak / i0.376, LOOK + ETA");
+        }
+
         [MenuItem("Tools/Elevator RL/Run Comparison (LOOK vs ETA vs ETA-weighted, same seed)")]
         static void RunComparisonUpPeak() => RunComparison(TrafficPattern.UpPeak);
 
@@ -471,6 +485,7 @@ namespace ElevatorRL.Editor
             var episode = col.Finish(id);
             var floorsRows = col.BuildFloorStats(id);
             var windowRows = col.BuildWindowStats(id);
+            var waitHistLines = quiet ? null : WaitHistLines(col.WaitHist);
             col.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -488,9 +503,20 @@ namespace ElevatorRL.Editor
                 var winLines = new List<string>(windowRows.Count);
                 foreach (var ws in windowRows) winLines.Add(ws.ToCsv());
                 StatsCsv.Write(Path.Combine(runDir, "window_stats.csv"), WindowStats.Header, winLines);
+
+                // delivered-wait distribution (bins) → ECDF / histogram charts
+                StatsCsv.Write(Path.Combine(runDir, "wait_hist.csv"), "binStart,binEnd,count", waitHistLines);
             }
 
             return (episode, runDir);
+        }
+
+        static List<string> WaitHistLines(WaitHistogram h)
+        {
+            var lines = new List<string>(h.BinCount);
+            for (int i = 0; i < h.BinCount; i++)
+                lines.Add($"{(i * h.BinWidth):F3},{((i + 1) * h.BinWidth):F3},{h.BinAt(i)}");
+            return lines;
         }
     }
 }

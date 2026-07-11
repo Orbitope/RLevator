@@ -286,6 +286,10 @@ namespace ElevatorRL.Stats
             return _windows;
         }
 
+        /// <summary>Global delivered-wait histogram (post-warmup) — the distribution behind the
+        /// p50/p95/max points, for ECDF / histogram export.</summary>
+        public WaitHistogram WaitHist => _wait;
+
         int CarsServing(int floor)
         {
             int n = 0;
