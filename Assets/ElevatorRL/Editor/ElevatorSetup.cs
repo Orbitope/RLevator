@@ -25,6 +25,31 @@ namespace ElevatorRL.Editor
         const string SandboxScene  = "Assets/Scenes/ElevatorSandbox.unity";
         const string ThemePath     = "Packages/com.mwburke.contentkit/ScriptableObjects/CKDefaultTheme.asset";
 
+        /// <summary>
+        /// Points the ElevatorController agent (created by Setup Scene) at the S scale-ladder
+        /// preset instead of the generic default BuildingConfig.asset. Needed for the M1 parity
+        /// gate ("PPO matches LOOK on rung S") to be a valid comparison — the default asset is
+        /// numElevators=10/randomizeActive=true, a different problem than rung S (8fl/3cars/fixed
+        /// fleet). One-off fix, not folded into SetupScene since it's specific to this milestone.
+        /// </summary>
+        [MenuItem("Tools/Elevator RL/Point Agent At S Preset (training)")]
+        static void PointAgentAtSPreset()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
+            var agent = go.GetComponent<ElevatorControllerAgent>();
+            if (agent == null) { Debug.LogError("[ElevatorRL] ElevatorController has no ElevatorControllerAgent component."); return; }
+
+            var sPreset = AssetDatabase.LoadAssetAtPath<BuildingConfig>("Assets/ElevatorRL/Config/Presets/S_BuildingConfig.asset");
+            if (sPreset == null) { Debug.LogError("[ElevatorRL] S_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
+
+            agent.buildingConfig = sPreset;
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {AssetDatabase.GetAssetPath(sPreset)} " +
+                      $"({sPreset.numFloors}fl/{sPreset.numElevators}cars, randomizeActive={sPreset.randomizeActive})");
+        }
+
         [MenuItem("Tools/Elevator RL/Setup Scene")]
         static void SetupScene()
         {
