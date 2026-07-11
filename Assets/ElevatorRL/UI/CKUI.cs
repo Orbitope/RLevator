@@ -5,9 +5,11 @@ using UnityEngine.UI;
 namespace ElevatorRL
 {
     /// <summary>
-    /// Terse uGUI construction helpers used by ElevatorSandbox.
+    /// Terse uGUI construction helpers used by ElevatorSandbox, and by the Editor-side report
+    /// scene builders (RunReportBuilder/OverallReportBuilder) in the separate ElevatorRL.Editor
+    /// assembly — public rather than internal so both can use it.
     /// </summary>
-    internal static class CKUI
+    public static class CKUI
     {
         // ── Panels / boxes ──────────────────────────────────────────────────
 
