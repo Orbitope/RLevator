@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.unity.ml-agents": "https://github.com/Unity-Technologies/ml-agents.git?path=/com.unity.ml-agents",
+    "com.unity.ml-agents": "4.0.2",
     "com.mwburke.contentkit": "file:../../com.mwburke.contentkit",
     "com.gamelovers.mcp-unity": "git@github.com:CoderGamester/mcp-unity.git",
     "com.unity.2d.animation": "13.0.4",

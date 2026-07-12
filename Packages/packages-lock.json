@@ -122,12 +122,12 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ai.inference": {
-      "version": "2.6.1",
+      "version": "2.5.0",
       "depth": 1,
       "source": "registry",
       "dependencies": {
         "com.unity.burst": "1.8.17",
-        "com.unity.dt.app-ui": "1.3.6",
+        "com.unity.dt.app-ui": "1.3.3",
         "com.unity.collections": "2.4.3",
         "com.unity.nuget.newtonsoft-json": "3.2.1",
         "com.unity.modules.imageconversion": "1.0.0"
@@ -242,16 +242,16 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ml-agents": {
-      "version": "https://github.com/Unity-Technologies/ml-agents.git?path=/com.unity.ml-agents",
+      "version": "4.0.2",
       "depth": 0,
-      "source": "git",
+      "source": "registry",
       "dependencies": {
-        "com.unity.ai.inference": "2.6.1",
-        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.ai.inference": "2.5.0",
+        "com.unity.modules.physics": "1.0.0",
         "com.unity.modules.jsonserialize": "1.0.0",
-        "com.unity.modules.physics": "1.0.0"
+        "com.unity.modules.imageconversion": "1.0.0"
       },
-      "hash": "eefc7ae221ec8f464253734f1047ea7e5cb0e6db"
+      "url": "https://packages.unity.com"
     },
     "com.unity.multiplayer.center": {
       "version": "1.0.1",
