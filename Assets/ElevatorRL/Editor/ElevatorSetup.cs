@@ -42,41 +42,37 @@ namespace ElevatorRL.Editor
         /// fleet). One-off fix, not folded into SetupScene since it's specific to this milestone.
         /// </summary>
         [MenuItem("Tools/Elevator RL/Point Agent At S Preset (training)")]
-        static void PointAgentAtSPreset()
-        {
-            var go = GameObject.Find("ElevatorController");
-            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
-            var agent = go.GetComponent<ElevatorControllerAgent>();
-            if (agent == null) { Debug.LogError("[ElevatorRL] ElevatorController has no ElevatorControllerAgent component."); return; }
-
-            var sPreset = AssetDatabase.LoadAssetAtPath<BuildingConfig>("Assets/ElevatorRL/Config/Presets/S_BuildingConfig.asset");
-            if (sPreset == null) { Debug.LogError("[ElevatorRL] S_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
-
-            agent.buildingConfig = sPreset;
-            ConfigureBrainParameters(go, agent);
-            EditorUtility.SetDirty(go);
-            EditorSceneManager.MarkSceneDirty(go.scene);
-            Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {AssetDatabase.GetAssetPath(sPreset)} " +
-                      $"({sPreset.numFloors}fl/{sPreset.numElevators}cars, randomizeActive={sPreset.randomizeActive})");
-        }
+        static void PointAgentAtSPreset() => PointAgentAtPreset("S");
 
         [MenuItem("Tools/Elevator RL/Point Agent At M Preset (training)")]
-        static void PointAgentAtMPreset()
+        static void PointAgentAtMPreset() => PointAgentAtPreset("M");
+
+        [MenuItem("Tools/Elevator RL/Point Agent At L Preset (training)")]
+        static void PointAgentAtLPreset() => PointAgentAtPreset("L");
+
+        [MenuItem("Tools/Elevator RL/Point Agent At Z Preset (training)")]
+        static void PointAgentAtZPreset() => PointAgentAtPreset("Z");
+
+        [MenuItem("Tools/Elevator RL/Point Agent At H Preset (training)")]
+        static void PointAgentAtHPreset() => PointAgentAtPreset("H");
+
+        static void PointAgentAtPreset(string presetName)
         {
             var go = GameObject.Find("ElevatorController");
             if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
             var agent = go.GetComponent<ElevatorControllerAgent>();
             if (agent == null) { Debug.LogError("[ElevatorRL] ElevatorController has no ElevatorControllerAgent component."); return; }
 
-            var mPreset = AssetDatabase.LoadAssetAtPath<BuildingConfig>("Assets/ElevatorRL/Config/Presets/M_BuildingConfig.asset");
-            if (mPreset == null) { Debug.LogError("[ElevatorRL] M_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
+            string path = $"Assets/ElevatorRL/Config/Presets/{presetName}_BuildingConfig.asset";
+            var preset = AssetDatabase.LoadAssetAtPath<BuildingConfig>(path);
+            if (preset == null) { Debug.LogError($"[ElevatorRL] {presetName}_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
 
-            agent.buildingConfig = mPreset;
+            agent.buildingConfig = preset;
             ConfigureBrainParameters(go, agent);
             EditorUtility.SetDirty(go);
             EditorSceneManager.MarkSceneDirty(go.scene);
-            Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {AssetDatabase.GetAssetPath(mPreset)} " +
-                      $"({mPreset.numFloors}fl/{mPreset.numElevators}cars, randomizeActive={mPreset.randomizeActive})");
+            Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {path} " +
+                      $"({preset.numFloors}fl/{preset.numElevators}cars, randomizeActive={preset.randomizeActive})");
         }
 
         /// <summary>
