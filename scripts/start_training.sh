@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# scripts/start_training.sh <run-id> [config-yaml] [env-build-path] [num-envs]
+# scripts/start_training.sh <run-id> [config-yaml] [env-build-path] [num-envs] [preset-name]
+#
+# preset-name (default S) selects which Assets/ElevatorRL/Config/Presets/<name>_BuildingConfig.asset
+# gets copied into the reproducibility snapshot — this MUST match whatever rung Training.unity's
+# ElevatorController is actually pointed at (via Tools > Elevator RL > Point Agent At <X> Preset),
+# or the snapshot silently mislabels which building the run used.
 #
 # With env-build-path set (e.g. Builds/HeadlessTrainer/RLevatorTrainer.app), runs
 # headless against that standalone build instead of the live Editor: no window,
@@ -23,14 +28,13 @@
 # ML-Agents itself already saves (into results/<run-id>/, not duplicated here):
 #   the resolved training config, model checkpoints (.onnx/.pt), and TensorBoard summaries.
 #
-# NOTE: if the ElevatorController agent's assigned config assets change (e.g. a
-# different BuildingConfig preset for a later rung), update the `cp` lines below to match.
 set -euo pipefail
 
-RUN_ID="${1:?Usage: start_training.sh <run-id> [config-yaml] [env-build-path] [num-envs]}"
+RUN_ID="${1:?Usage: start_training.sh <run-id> [config-yaml] [env-build-path] [num-envs] [preset-name]}"
 CONFIG="${2:-config/elevator_ppo.yaml}"
 ENV_BUILD="${3:-}"
 NUM_ENVS="${4:-1}"
+PRESET="${5:-S}"
 VENV="$HOME/mlagents-venv"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SNAP_DIR="$PROJECT_ROOT/Runs/training/$RUN_ID"
@@ -56,7 +60,7 @@ cp "$PROJECT_ROOT/$CONFIG" "$SNAP_DIR/training_config.yaml"
 grep -A6 '"com.unity.ml-agents"' "$PROJECT_ROOT/Packages/packages-lock.json" > "$SNAP_DIR/ml_agents_package_version.txt" || true
 
 # Config ScriptableObjects wired to ElevatorController in Assets/Scenes/Training.unity
-cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/Presets/S_BuildingConfig.asset" "$SNAP_DIR/configs/BuildingConfig.asset"
+cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/Presets/${PRESET}_BuildingConfig.asset" "$SNAP_DIR/configs/BuildingConfig.asset"
 cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/RewardConfig.asset"      "$SNAP_DIR/configs/"
 cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/ObservationConfig.asset" "$SNAP_DIR/configs/"
 cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/TrafficConfig.asset"     "$SNAP_DIR/configs/"

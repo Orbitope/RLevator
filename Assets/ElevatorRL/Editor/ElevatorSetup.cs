@@ -60,6 +60,25 @@ namespace ElevatorRL.Editor
                       $"({sPreset.numFloors}fl/{sPreset.numElevators}cars, randomizeActive={sPreset.randomizeActive})");
         }
 
+        [MenuItem("Tools/Elevator RL/Point Agent At M Preset (training)")]
+        static void PointAgentAtMPreset()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
+            var agent = go.GetComponent<ElevatorControllerAgent>();
+            if (agent == null) { Debug.LogError("[ElevatorRL] ElevatorController has no ElevatorControllerAgent component."); return; }
+
+            var mPreset = AssetDatabase.LoadAssetAtPath<BuildingConfig>("Assets/ElevatorRL/Config/Presets/M_BuildingConfig.asset");
+            if (mPreset == null) { Debug.LogError("[ElevatorRL] M_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
+
+            agent.buildingConfig = mPreset;
+            ConfigureBrainParameters(go, agent);
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {AssetDatabase.GetAssetPath(mPreset)} " +
+                      $"({mPreset.numFloors}fl/{mPreset.numElevators}cars, randomizeActive={mPreset.randomizeActive})");
+        }
+
         /// <summary>
         /// Bakes BehaviorParameters.BrainParameters.ActionSpec/VectorObservationSize into the
         /// SAVED SCENE at editor time, computed from whatever configs are currently assigned to
