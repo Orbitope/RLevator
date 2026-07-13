@@ -162,13 +162,23 @@ namespace ElevatorRL.Editor
         static void RunE3SweepM10M() => RunScaleLadderSweep("M-10M", 16, 5, 8,
             "Assets/ElevatorRL/Models/ElevatorController_M_e3_10m.onnx", obsSize: 254);
 
+        // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
+        // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
+        // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),
+        // not the whole-fleet size — for M that's 102 (see MultiAgentSetup log / TrainingMultiAgent.unity).
+        [MenuItem("Tools/Elevator RL/E6 Multi-Agent/Run Sweep (LOOK vs ETA vs PPO-multi, rung M, seeds 1-5)")]
+        static void RunE6ASweepM() => RunScaleLadderSweep("M-e6a", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e6a.onnx", obsSize: 102, multiAgent: true);
+
         // EXPERIMENT_PLAN.md E3: same LOOK/ETA/PPO comparison as E2, generalized across the scale
         // ladder. NOTE intensity is still the fixed SmokeIntensity (0.5), matching E2's methodology
         // for apples-to-apples continuity — NOT each rung's calibrated saturation point (§3: S≈1.33,
         // M≈0.41, ...), so cross-rung comparisons here are at different *relative* loads. Fine for
         // "does PPO beat LOOK on this rung" but not yet the calibrated-intensity headline figure.
+        // multiAgent=true uses the E6-A per-car shared policy (MultiAgentPpoDispatcher) and treats
+        // obsSize as the per-car observation size; false uses the flat single-agent PpoDispatcher.
         static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
-            string modelPath, int obsSize)
+            string modelPath, int obsSize, bool multiAgent = false)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
             const TrafficPattern pattern = TrafficPattern.UpPeak;
@@ -180,7 +190,9 @@ namespace ElevatorRL.Editor
                 Debug.LogError($"[Eval] Could not load ModelAsset at {modelPath}.");
                 return;
             }
-            using var ppo = new PpoDispatcher(modelAsset, obsSize);
+            var ppoMulti = multiAgent ? new MultiAgentPpoDispatcher(modelAsset, obsSize) : null;
+            var ppoFlat = multiAgent ? null : new PpoDispatcher(modelAsset, obsSize);
+            Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : ppoFlat.Dispatch;
 
             var rows = new List<string> {
                 "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
@@ -193,7 +205,7 @@ namespace ElevatorRL.Editor
                 var etaHeuristic = new EtaHeuristic(cars);
                 var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
-                var (ppoEp, _) = RunSingle("PPO", ppo.Dispatch, rungName,
+                var (ppoEp, _) = RunSingle("PPO", ppoDispatch, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
 
                 foreach (var (name, e) in new[] { ("LOOK", look), ("ETA", eta), ("PPO", ppoEp) })
@@ -204,6 +216,9 @@ namespace ElevatorRL.Editor
                           $"ETA delivered={eta.delivered} waitMean={eta.waitMean:0.0}s | " +
                           $"PPO delivered={ppoEp.delivered} waitMean={ppoEp.waitMean:0.0}s");
             }
+
+            ppoMulti?.Dispose();
+            ppoFlat?.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E3-sweep-{rungName}-UpPeak");
