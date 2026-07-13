@@ -155,6 +155,13 @@ namespace ElevatorRL.Editor
         static void RunE3SweepM() => RunScaleLadderSweep("M", 16, 5, 8,
             "Assets/ElevatorRL/Models/ElevatorController_M_e3.onnx", obsSize: 254);
 
+        // elev-e3-m-ppo-01 resumed from 5M -> 10M steps (same recipe) to test whether M's
+        // still-climbing reward curve was "hasn't finished training" rather than a hard
+        // architecture ceiling — see EXPERIMENT_PLAN.md E3.
+        [MenuItem("Tools/Elevator RL/Run E3 Sweep (LOOK vs ETA vs PPO, rung M, 10M steps, seeds 1-5)")]
+        static void RunE3SweepM10M() => RunScaleLadderSweep("M-10M", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e3_10m.onnx", obsSize: 254);
+
         // EXPERIMENT_PLAN.md E3: same LOOK/ETA/PPO comparison as E2, generalized across the scale
         // ladder. NOTE intensity is still the fixed SmokeIntensity (0.5), matching E2's methodology
         // for apples-to-apples continuity — NOT each rung's calibrated saturation point (§3: S≈1.33,

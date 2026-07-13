@@ -272,27 +272,34 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   methodology, not yet each rung's calibrated saturation point per §3 — S≈1.33, M≈0.41. At 0.5, M
   is running *closer to* its own saturation edge than S is to its. This is a real methodology gap
   to close before treating the current S→M trend as the final headline curve.)
-- **Result so far — rung M is a sharp reversal from rung S** (2026-07-13, run `elev-e3-m-ppo-01`,
-  5M steps, same hyperparameters as the S run, M preset — 16 floors/5 cars, UpPeak, intensity 0.5,
-  seeds 1–5, same eval protocol as E2):
+- **Result so far — rung M reverses from rung S, but mostly closes with more training** (M preset —
+  16 floors/5 cars, UpPeak, intensity 0.5, seeds 1–5, same eval protocol as E2):
 
   | | delivered | waitMean |
   |---|---|---|
   | LOOK | 2054–2164 | 15.7–17.7s |
   | ETA | 2056–2161 | 17.0–18.1s |
-  | **PPO** | **1526–1629** | **20.7–21.2s** |
+  | PPO @ 5M steps | 1526–1629 | 20.7–21.2s |
+  | **PPO @ 10M steps** | **1935–1979** | **19.9–20.5s** |
 
-  PPO now delivers ~25% *fewer* passengers and waits ~20% *longer* than both baselines — the
-  opposite direction from S, and just as consistent (no range overlap across 5 eval seeds). Full
-  data: `Runs/20260713-125134-E3-sweep-M-UpPeak/sweep_summary.csv`. Training reward did plateau
-  (~-9500 for the last ~1M of 5M steps), so this doesn't look like an unconverged run — more likely
-  the same fixed hyperparameters/network (256×2 MLP, no weight sharing across cars) that worked for
-  a 3-car coordination problem don't scale to 5-car coordination in the same training budget. This
-  is exactly the concern E6 is designed to test (shared per-car encoder / attention vs. flat MLP)
-  — the S→M trend argues for pulling E6 forward rather than treating S→H under the current flat-MLP
-  recipe as the real headline curve. Proceeding to train L next (same recipe) to see whether the
-  regression continues/worsens, since that's itself informative, but E6 should follow soon after
-  rather than waiting for Z/H.
+  At the same 5M-step budget as the S run (`elev-e3-m-ppo-01`), PPO delivered ~25% *fewer*
+  passengers and waited ~20% *longer* than both baselines — the opposite direction from S. Initial
+  read was a hard architecture ceiling (flat 256×2 MLP, no weight sharing across cars, not scaling
+  from 3-car to 5-car coordination) — but checking the reward curve shape first showed M's reward
+  was still climbing meaningfully faster than S's had by the same point (S flat by 5M; M gained
+  ~4300 reward in its last 2.8M steps), arguing for "hadn't finished training" over "can't learn
+  this." Resumed the same run to 10M steps (`resume_training.sh`, same architecture/hyperparameters,
+  no changes) and re-evaluated: **closed ~65-70% of the delivered-count gap** (was ~500 behind
+  LOOK/ETA, now ~150-200 behind), smaller improvement on wait time. So more training steps clearly
+  help a lot — this was NOT primarily an architecture ceiling at 5M — but PPO still hasn't caught
+  LOOK/ETA even at 10M (2x the S-rung budget), so there's a real remaining gap, and/or diminishing
+  returns are setting in (reward was leveling off near the end of the 10M run, less clearly than a
+  hard plateau but less steep than earlier). Full data: `sweep_summary.csv` under
+  `Runs/20260713-125134-E3-sweep-M-UpPeak/` (5M) and `Runs/20260713-142044-E3-sweep-M-10M-UpPeak/`
+  (10M). Open question for the next step: extend further (e.g. 15-20M) to see if it fully closes,
+  or treat the remaining gap as evidence the flat-MLP architecture needs help (E6: shared per-car
+  encoder / attention) even once given enough time. Decision pending — not yet resolved before
+  training L.
 
 ### E4 — Zoning / floor-restriction stress *(the core of the thesis)*
 - **Q:** With per-car banks (rung **Z**), does RL exploit the structure better than range-aware
