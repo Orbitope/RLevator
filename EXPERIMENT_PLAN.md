@@ -262,7 +262,7 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   mechanism §0 describes. Single-run caveat: one training seed so far (`elev-e2-s-ppo-01`); the
   5-seed sweep above is on the *eval* side only, not repeated training runs.
 
-### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — IN PROGRESS (S, M done)
+### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — PAUSED after S, M (see E6)
 - **Q:** Does the RL−LOOK performance gap grow along S→M→L→Z→H?
 - **Arms:** LOOK, (ETA), PPO-best-architecture, per rung.
 - **Metric:** relative improvement in avg wait / p95 wait / abandonment vs. LOOK, plotted **as a
@@ -315,10 +315,35 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   "realistic"} vs {+ wait-age}. Cheap: config-only, no code.
 - **Metric:** convergence performance per obs set; expect wait-age to matter most on Z/H.
 
-### E6 — Architecture: flat MLP vs. shared per-car vs. attention
+### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **PULLED FORWARD, active now**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
 - **Arms:** flat MLP (baseline), shared per-car encoder, attention.
 - **Metric:** performance & sample-efficiency on L and H; this is where scalability is won or lost.
+- **2026-07-13 — paused E3's S→H ladder here.** M's flat-MLP result (5M steps: PPO badly behind
+  LOOK/ETA; 10M steps: closed most but not all of the gap) shows the single-agent/flat-observation
+  architecture is running out of information/capacity to coordinate 5 cars, and L (8 cars) would
+  only be harder. Rather than keep burning ~80min/5M-step runs on a recipe that may not scale,
+  moving to E6 now: design and implement a shared per-car architecture before resuming the ladder.
+  Two concrete implementation paths to choose between (not yet decided):
+  1. **Multi-agent parameter sharing (ML-Agents-native):** replace the single
+     `ElevatorControllerAgent` (one flat MultiDiscrete action, one big concatenated observation)
+     with N per-car `Agent` instances — one per elevator — all sharing the same Behavior Name.
+     ML-Agents automatically ties their policy weights together when the Behavior Name matches, so
+     this gets "shared per-car encoder" for free from the platform, no custom network code. Each
+     car agent would observe its own local state (floor, direction, its own queue calls) plus
+     whatever shared/global state it needs (hall calls building-wide, other cars' positions), and
+     emit one 6-way discrete action for itself. Requires deciding: individual vs. shared/team
+     reward (shared reward is the more faithful MDP for a dispatch problem where cars must
+     cooperate, but can be a harder credit-assignment target), and reworking who owns
+     `Building.Tick()`/decision cadence now that no single agent owns the whole loop.
+  2. **Custom shared-encoder network, same single-agent structure:** keep one
+     `ElevatorControllerAgent`/one MultiDiscrete action, but replace ML-Agents' default flat MLP
+     with a custom network (extending `Unity.MLAgents.Extensions` or a custom `NetworkBody`) that
+     runs one shared small encoder over each car's observation slice, then concatenates/pools those
+     encodings before the shared trunk — closer to the literal "shared per-car encoder" phrasing in
+     this section, but needs custom ML-Agents network code (no longer just YAML config), which is
+     more implementation risk/time than option 1.
+  Decision on which path, plus the reward-shaping question in option 1, pending discussion.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
