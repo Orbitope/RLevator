@@ -235,11 +235,32 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Output:** the reference surface every later result is measured against; also the first
   evidence for/against the thesis (does LOOK's tail wait blow up on Z/H?).
 
-### E2 — RL parity in the easy regime
+### E2 — RL parity in the easy regime — **DONE, result: PPO beats both baselines on rung S**
 - **Q:** Can PPO match LOOK on rung **S**? (Necessary floor; if it can't match here, fix the
   setup before scaling.)
 - **Arms:** LOOK vs. PPO (flat MLP). Fixed fleet, no restrictions.
 - **Metric:** % of LOOK's throughput and wait at convergence. Target: ≈100%.
+- **Result (2026-07-13, run `elev-e2-s-ppo-01`, 5M steps, S preset — 8 floors/3 cars, UpPeak,
+  intensity 0.5, seeds 1–5, 3600s/episode after 300s warmup):** PPO didn't just match LOOK, it beat
+  both baselines on every metric, consistently across all 5 seeds (no range overlap):
+
+  | | delivered | waitMean | waitP95 |
+  |---|---|---|---|
+  | LOOK | 1662–1709 | 16.0–17.0s | ~37s |
+  | ETA | 1612–1677 | 16.0–17.5s | ~37s |
+  | **PPO** | **1815–1837** | **14.0–15.2s** | **~33s** |
+
+  Full per-seed data: `Runs/20260713-112355-E2-sweep-S-UpPeak/e2_sweep_summary.csv`. Eval method:
+  `PpoDispatcher` (`Assets/ElevatorRL/Editor/PpoDispatcher.cs`) runs the trained ONNX directly via
+  Sentis/InferenceEngine as an `EvalHarness` `Dispatcher`, reusing the real
+  `Building.WriteObservation` and the AS0 action-mask logic — so it's evaluated through the exact
+  same Building/StatsCollector loop as LOOK/ETA, not a reimplementation.
+  **This is a surprising result relative to §0's thesis** (RL should win at scale/zoning, not on
+  small rungs — c.f. Crites & Barto's 10-floor/4-car requirement, Appendix). Worth watching whether
+  the RL−LOOK gap *grows* through E3's scale ladder (expected) or whether S was already close to
+  saturated/informative enough that PPO's edge here doesn't cleanly separate from the scale-driven
+  mechanism §0 describes. Single-run caveat: one training seed so far (`elev-e2-s-ppo-01`); the
+  5-seed sweep above is on the *eval* side only, not repeated training runs.
 
 ### E3 — **The headline: RL vs. LOOK as scale/constraint increases**
 - **Q:** Does the RL−LOOK performance gap grow along S→M→L→Z→H?
@@ -403,10 +424,10 @@ the M1/M2 milestones below.
    implemented and producing real data (§1.2 findings 1–3; §3 calibrated intensities). Remaining:
    more seeds per cell (currently 1-2), DownPeak/Midday/Uniform patterns, and committing the
    sweep-runner code + this doc's findings.
-2. **M1 — Trainable setup (E2) — code fixes DONE, training/parity not yet run.** §2's truncation,
-   horizon/γ default, and wait-age observation are all applied. Remaining: actually train PPO on
-   rung S and confirm it matches LOOK (the parity gate) — needs `mlagents-learn` installed/run,
-   not yet done.
+2. **M1 — Trainable setup (E2) — DONE.** §2's truncation, horizon/γ default, and wait-age
+   observation are all applied. PPO trained on rung S (`elev-e2-s-ppo-01`, headless/parallel
+   pipeline — see §2 note below) and evaluated vs LOOK/ETA across 5 seeds: PPO wins outright, not
+   just parity (see E2 above). Parity gate cleared and then some.
 3. **M2 — Scale curve (E3).** Train/eval across S→H; produce the gap-vs-rung headline figure.
 4. **M3 — Zoning + obs (E4, E5).** The thesis core + cheap ablations.
 5. **M4 — Architecture + generalization (E6, E7).** Unlock large fleets; one-policy-many-fleets.

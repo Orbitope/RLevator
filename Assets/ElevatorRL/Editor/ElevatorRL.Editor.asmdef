@@ -6,6 +6,8 @@
         "ElevatorRL.UI",
         "Unity.ML-Agents",
         "Unity.ML-Agents.Editor",
+        "GUID:63a57c8b658089e49a173b0f0c4870a7",
+        "GUID:9a9be325188f03b488b3cc911c32a3bc",
         "ContentKit.Runtime",
         "ContentKit.Editor",
         "Unity.TextMeshPro",

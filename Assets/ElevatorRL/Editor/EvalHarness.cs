@@ -103,6 +103,96 @@ namespace ElevatorRL.Editor
                       "(same target logic, slightly different resolve).");
         }
 
+        // EXPERIMENT_PLAN.md E2: does the trained rung-S PPO policy (elev-e2-s-ppo-01, 5M steps)
+        // match or beat LOOK/ETA under the exact same seed/traffic used for the E1 baselines?
+        // Runs all three through the identical RunSingle/RunCore loop (Building + StatsCollector) —
+        // PPO's actions come from PpoDispatcher, which reuses the real observation/mask code so
+        // this is not a reimplementation of what the agent sees, just a different action source.
+        [MenuItem("Tools/Elevator RL/Run E2 Comparison (LOOK vs ETA vs PPO, rung S)")]
+        static void RunE2Comparison()
+        {
+            const int seed = 1;
+            const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
+            const int floors = 8, cars = 3, capacity = 8;
+            const TrafficPattern pattern = TrafficPattern.UpPeak;
+
+            var (look, lookDir) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, "S",
+                floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket);
+
+            var etaHeuristic = new EtaHeuristic(cars);
+            var (eta, etaDir) = RunSingle("ETA", etaHeuristic.Dispatch, "S",
+                floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket);
+
+            const string modelPath = "Assets/ElevatorRL/Models/ElevatorController_S_e2.onnx";
+            var modelAsset = AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>(modelPath);
+            if (modelAsset == null)
+            {
+                Debug.LogError($"[Eval] Could not load ModelAsset at {modelPath} — " +
+                    "select it in the Project window and check the Inspector imports it as a Model " +
+                    "(right-click > Reimport if it shows as a plain file).");
+                return;
+            }
+
+            // obsSize/branch width must match training exactly — Training.unity's baked
+            // BrainParameters for S_BuildingConfig (8 floors, 3 cars, Primitive/AS0): 98.
+            using var ppo = new PpoDispatcher(modelAsset, obsSize: 98);
+            var (ppoEp, ppoDir) = RunSingle("PPO", ppo.Dispatch, "S",
+                floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket);
+
+            Debug.Log("[Eval] " + Summarize(look, lookDir));
+            Debug.Log("[Eval] " + Summarize(eta, etaDir));
+            Debug.Log("[Eval] " + Summarize(ppoEp, ppoDir));
+        }
+
+        // Multi-seed follow-up to RunE2Comparison: is the single-seed PPO win real, or a draw of
+        // that particular seed? Same traffic/rung, seeds 1-5, one aggregate CSV under Runs/ so the
+        // per-seed numbers are logged and reproducible, not just Console output.
+        [MenuItem("Tools/Elevator RL/Run E2 Sweep (LOOK vs ETA vs PPO, rung S, seeds 1-5)")]
+        static void RunE2SweepSeeds()
+        {
+            const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
+            const int floors = 8, cars = 3, capacity = 8;
+            const TrafficPattern pattern = TrafficPattern.UpPeak;
+            int[] seeds = { 1, 2, 3, 4, 5 };
+
+            const string modelPath = "Assets/ElevatorRL/Models/ElevatorController_S_e2.onnx";
+            var modelAsset = AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>(modelPath);
+            if (modelAsset == null)
+            {
+                Debug.LogError($"[Eval] Could not load ModelAsset at {modelPath}.");
+                return;
+            }
+            using var ppo = new PpoDispatcher(modelAsset, obsSize: 98);
+
+            var rows = new List<string> {
+                "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
+            };
+
+            foreach (var seed in seeds)
+            {
+                var (look, _) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, "S",
+                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+                var etaHeuristic = new EtaHeuristic(cars);
+                var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, "S",
+                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+                var (ppoEp, _) = RunSingle("PPO", ppo.Dispatch, "S",
+                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+
+                foreach (var (name, e) in new[] { ("LOOK", look), ("ETA", eta), ("PPO", ppoEp) })
+                    rows.Add($"{name},{seed},{e.delivered},{e.waitMean:0.00},{e.waitP95:0.00},{e.waitMax:0.00}," +
+                             $"{e.abandoned},{e.rejected},{e.utilFleetMean:0.000},{e.rwTotal:0}");
+
+                Debug.Log($"[Eval] seed={seed} LOOK delivered={look.delivered} waitMean={look.waitMean:0.0}s | " +
+                          $"ETA delivered={eta.delivered} waitMean={eta.waitMean:0.0}s | " +
+                          $"PPO delivered={ppoEp.delivered} waitMean={ppoEp.waitMean:0.0}s");
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E2-sweep-S-UpPeak");
+            StatsCsv.Write(Path.Combine(outDir, "e2_sweep_summary.csv"), rows[0], rows.GetRange(1, rows.Count - 1));
+            Debug.Log($"[Eval] E2 sweep complete — {outDir}/e2_sweep_summary.csv");
+        }
+
         [MenuItem("Tools/Elevator RL/Generate wait_hist demo (L UpPeak, LOOK+ETA)")]
         static void GenWaitHistDemo()
         {
