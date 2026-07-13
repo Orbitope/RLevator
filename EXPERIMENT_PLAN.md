@@ -262,13 +262,37 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   mechanism §0 describes. Single-run caveat: one training seed so far (`elev-e2-s-ppo-01`); the
   5-seed sweep above is on the *eval* side only, not repeated training runs.
 
-### E3 — **The headline: RL vs. LOOK as scale/constraint increases**
+### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — IN PROGRESS (S, M done)
 - **Q:** Does the RL−LOOK performance gap grow along S→M→L→Z→H?
 - **Arms:** LOOK, (ETA), PPO-best-architecture, per rung.
 - **Metric:** relative improvement in avg wait / p95 wait / abandonment vs. LOOK, plotted **as a
   function of rung**. This curve is the paper/blog thesis figure.
 - **Focus:** UpPeak & DownPeak at intensity ≥ 1.5, where the mechanism (§0) predicts the largest
-  gap.
+  gap. (Note: the S/M results below use the fixed `SmokeIntensity=0.5` for continuity with E2's
+  methodology, not yet each rung's calibrated saturation point per §3 — S≈1.33, M≈0.41. At 0.5, M
+  is running *closer to* its own saturation edge than S is to its. This is a real methodology gap
+  to close before treating the current S→M trend as the final headline curve.)
+- **Result so far — rung M is a sharp reversal from rung S** (2026-07-13, run `elev-e3-m-ppo-01`,
+  5M steps, same hyperparameters as the S run, M preset — 16 floors/5 cars, UpPeak, intensity 0.5,
+  seeds 1–5, same eval protocol as E2):
+
+  | | delivered | waitMean |
+  |---|---|---|
+  | LOOK | 2054–2164 | 15.7–17.7s |
+  | ETA | 2056–2161 | 17.0–18.1s |
+  | **PPO** | **1526–1629** | **20.7–21.2s** |
+
+  PPO now delivers ~25% *fewer* passengers and waits ~20% *longer* than both baselines — the
+  opposite direction from S, and just as consistent (no range overlap across 5 eval seeds). Full
+  data: `Runs/20260713-125134-E3-sweep-M-UpPeak/sweep_summary.csv`. Training reward did plateau
+  (~-9500 for the last ~1M of 5M steps), so this doesn't look like an unconverged run — more likely
+  the same fixed hyperparameters/network (256×2 MLP, no weight sharing across cars) that worked for
+  a 3-car coordination problem don't scale to 5-car coordination in the same training budget. This
+  is exactly the concern E6 is designed to test (shared per-car encoder / attention vs. flat MLP)
+  — the S→M trend argues for pulling E6 forward rather than treating S→H under the current flat-MLP
+  recipe as the real headline curve. Proceeding to train L next (same recipe) to see whether the
+  regression continues/worsens, since that's itself informative, but E6 should follow soon after
+  rather than waiting for Z/H.
 
 ### E4 — Zoning / floor-restriction stress *(the core of the thesis)*
 - **Q:** With per-car banks (rung **Z**), does RL exploit the structure better than range-aware

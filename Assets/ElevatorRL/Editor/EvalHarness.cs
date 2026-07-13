@@ -148,21 +148,32 @@ namespace ElevatorRL.Editor
         // that particular seed? Same traffic/rung, seeds 1-5, one aggregate CSV under Runs/ so the
         // per-seed numbers are logged and reproducible, not just Console output.
         [MenuItem("Tools/Elevator RL/Run E2 Sweep (LOOK vs ETA vs PPO, rung S, seeds 1-5)")]
-        static void RunE2SweepSeeds()
+        static void RunE2SweepSeeds() => RunScaleLadderSweep("S", 8, 3, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_S_e2.onnx", obsSize: 98);
+
+        [MenuItem("Tools/Elevator RL/Run E3 Sweep (LOOK vs ETA vs PPO, rung M, seeds 1-5)")]
+        static void RunE3SweepM() => RunScaleLadderSweep("M", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e3.onnx", obsSize: 254);
+
+        // EXPERIMENT_PLAN.md E3: same LOOK/ETA/PPO comparison as E2, generalized across the scale
+        // ladder. NOTE intensity is still the fixed SmokeIntensity (0.5), matching E2's methodology
+        // for apples-to-apples continuity — NOT each rung's calibrated saturation point (§3: S≈1.33,
+        // M≈0.41, ...), so cross-rung comparisons here are at different *relative* loads. Fine for
+        // "does PPO beat LOOK on this rung" but not yet the calibrated-intensity headline figure.
+        static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
+            string modelPath, int obsSize)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
-            const int floors = 8, cars = 3, capacity = 8;
             const TrafficPattern pattern = TrafficPattern.UpPeak;
             int[] seeds = { 1, 2, 3, 4, 5 };
 
-            const string modelPath = "Assets/ElevatorRL/Models/ElevatorController_S_e2.onnx";
             var modelAsset = AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>(modelPath);
             if (modelAsset == null)
             {
                 Debug.LogError($"[Eval] Could not load ModelAsset at {modelPath}.");
                 return;
             }
-            using var ppo = new PpoDispatcher(modelAsset, obsSize: 98);
+            using var ppo = new PpoDispatcher(modelAsset, obsSize);
 
             var rows = new List<string> {
                 "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
@@ -170,27 +181,27 @@ namespace ElevatorRL.Editor
 
             foreach (var seed in seeds)
             {
-                var (look, _) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, "S",
+                var (look, _) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
                 var etaHeuristic = new EtaHeuristic(cars);
-                var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, "S",
+                var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
-                var (ppoEp, _) = RunSingle("PPO", ppo.Dispatch, "S",
+                var (ppoEp, _) = RunSingle("PPO", ppo.Dispatch, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
 
                 foreach (var (name, e) in new[] { ("LOOK", look), ("ETA", eta), ("PPO", ppoEp) })
                     rows.Add($"{name},{seed},{e.delivered},{e.waitMean:0.00},{e.waitP95:0.00},{e.waitMax:0.00}," +
                              $"{e.abandoned},{e.rejected},{e.utilFleetMean:0.000},{e.rwTotal:0}");
 
-                Debug.Log($"[Eval] seed={seed} LOOK delivered={look.delivered} waitMean={look.waitMean:0.0}s | " +
+                Debug.Log($"[Eval] rung={rungName} seed={seed} LOOK delivered={look.delivered} waitMean={look.waitMean:0.0}s | " +
                           $"ETA delivered={eta.delivered} waitMean={eta.waitMean:0.0}s | " +
                           $"PPO delivered={ppoEp.delivered} waitMean={ppoEp.waitMean:0.0}s");
             }
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E2-sweep-S-UpPeak");
-            StatsCsv.Write(Path.Combine(outDir, "e2_sweep_summary.csv"), rows[0], rows.GetRange(1, rows.Count - 1));
-            Debug.Log($"[Eval] E2 sweep complete — {outDir}/e2_sweep_summary.csv");
+            string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E3-sweep-{rungName}-UpPeak");
+            StatsCsv.Write(Path.Combine(outDir, "sweep_summary.csv"), rows[0], rows.GetRange(1, rows.Count - 1));
+            Debug.Log($"[Eval] {rungName} sweep complete — {outDir}/sweep_summary.csv");
         }
 
         [MenuItem("Tools/Elevator RL/Generate wait_hist demo (L UpPeak, LOOK+ETA)")]
