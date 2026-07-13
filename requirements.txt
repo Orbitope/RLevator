@@ -1,0 +1,17 @@
+# Python venv for training (~/mlagents-venv), Python 3.10.
+#
+# mlagents==1.1.0 hard-pins onnx==1.15.0 and protobuf<3.21 (protobuf is used for the
+# actual gRPC communication with the Unity C# side, via com.unity.ml-agents 4.0.2 —
+# do not let this drift upward, it will silently break the Unity<->Python link).
+#
+# torch is NOT pinned by mlagents itself and defaults to resolving latest, but recent
+# torch (2.5+) made its ONNX exporter mandatory-dynamo, which requires `onnxscript`,
+# which in turn requires onnx>=1.16/1.17 — directly incompatible with mlagents' pin.
+# torch==2.3.1 predates that and exports fine via the legacy TorchScript path with no
+# onnxscript dependency at all. Matches the proven-working pin used in the sibling
+# Pushman project (same mlagents/ml-agents version pair).
+mlagents==1.1.0
+torch==2.3.1
+onnx==1.15.0
+protobuf==3.20.3
+setuptools<71

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -141,7 +142,11 @@ namespace ElevatorRL
                 }
             }
 
-            if (view != null) view.Mirror(_b);
+            // Skip visualization entirely under -nographics (headless training builds): the
+            // required shader isn't stripped-in for a graphics-less build (Shader.Find returns
+            // null there), and there's no point paying render cost across N parallel workers anyway.
+            if (view != null && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                view.Mirror(_b);
         }
 
         bool AnyCarAtFloor()

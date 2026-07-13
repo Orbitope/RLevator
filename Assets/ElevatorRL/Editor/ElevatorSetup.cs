@@ -9,6 +9,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Policies;
 
 namespace ElevatorRL.Editor
@@ -24,6 +25,14 @@ namespace ElevatorRL.Editor
         const string FontFolder    = "Assets/ElevatorRL/UI/Fonts";
         const string SandboxScene  = "Assets/Scenes/ElevatorSandbox.unity";
         const string ThemePath     = "Packages/com.mwburke.contentkit/ScriptableObjects/CKDefaultTheme.asset";
+
+        /// <summary>
+        /// Toggles Play mode via script — there's no built-in menu item for the Play button (it's
+        /// toolbar-only) and no dedicated tool for it in the MCP Unity bridge, so this is the
+        /// reliable way to start/stop an mlagents-learn training connection remotely.
+        /// </summary>
+        [MenuItem("Tools/Elevator RL/Toggle Play Mode")]
+        static void TogglePlayMode() => EditorApplication.isPlaying = !EditorApplication.isPlaying;
 
         /// <summary>
         /// Points the ElevatorController agent (created by Setup Scene) at the S scale-ladder
@@ -44,10 +53,44 @@ namespace ElevatorRL.Editor
             if (sPreset == null) { Debug.LogError("[ElevatorRL] S_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
 
             agent.buildingConfig = sPreset;
+            ConfigureBrainParameters(go, agent);
             EditorUtility.SetDirty(go);
             EditorSceneManager.MarkSceneDirty(go.scene);
             Debug.Log($"[ElevatorRL] ElevatorController.buildingConfig -> {AssetDatabase.GetAssetPath(sPreset)} " +
                       $"({sPreset.numFloors}fl/{sPreset.numElevators}cars, randomizeActive={sPreset.randomizeActive})");
+        }
+
+        /// <summary>
+        /// Bakes BehaviorParameters.BrainParameters.ActionSpec/VectorObservationSize into the
+        /// SAVED SCENE at editor time, computed from whatever configs are currently assigned to
+        /// the agent. This must be done here, not in ElevatorControllerAgent.Initialize() — Unity
+        /// ML-Agents' actuator/policy setup reads BrainParameters.ActionSpec BEFORE the Agent's
+        /// user Initialize() override runs, so setting it at runtime is too late once a stale
+        /// value has already been serialized (e.g. from an earlier Setup Scene run against a
+        /// different-car-count BuildingConfig) — this produced a real
+        /// "Action Mask is too large for specified branch" crash in Play mode. Confirmed pattern:
+        /// Pushman's PushmanSetup.cs configures ActionSpec the same way, at editor/setup time.
+        /// Call this any time buildingConfig, observationConfig, or actionSpace changes.
+        /// </summary>
+        static void ConfigureBrainParameters(GameObject go, ElevatorControllerAgent agent)
+        {
+            var bp = go.GetComponent<BehaviorParameters>();
+            if (bp == null) { Debug.LogError("[ElevatorRL] No BehaviorParameters on " + go.name); return; }
+
+            // Building's constructor only allocates arrays from config references — safe/cheap to
+            // build a throwaway instance purely to compute ObservationSize() at editor time.
+            var tempBuilding = new Building(agent.buildingConfig, agent.rewardConfig, agent.observationConfig, agent.trafficConfig, 1);
+
+            int E = agent.buildingConfig.numElevators;
+            int branchSize = agent.actionSpace == ActionSpaceMode.TargetFloor ? agent.buildingConfig.numFloors : 6;
+            var branches = new int[E];
+            for (int i = 0; i < E; i++) branches[i] = branchSize;
+
+            bp.BrainParameters.ActionSpec = ActionSpec.MakeDiscrete(branches);
+            bp.BrainParameters.VectorObservationSize = tempBuilding.ObservationSize();
+            EditorUtility.SetDirty(bp);
+            Debug.Log($"[ElevatorRL] Baked BrainParameters: {E} branches x size {branchSize} " +
+                      $"({agent.actionSpace}), VectorObservationSize={tempBuilding.ObservationSize()}");
         }
 
         [MenuItem("Tools/Elevator RL/Setup Scene")]

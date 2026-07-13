@@ -54,3 +54,11 @@ Thumbs.db
 # Elevator RL eval output (raw per-run data; see STATS_VIZ_REPLAY_PLAN.md §3 —
 # curated results belong in Results/, which IS tracked)
 /Runs/
+
+# ML-Agents' own raw output (checkpoints, .onnx, tfevents) — regenerable from a
+# Runs/training/<run-id> reproducibility snapshot + training_config.yaml
+/results/
+
+# ML-Agents Editor profiling dump, regenerated every training/eval session
+/Assets/ML-Agents/
+/Assets/ML-Agents.meta
