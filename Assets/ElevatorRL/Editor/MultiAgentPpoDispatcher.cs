@@ -29,6 +29,12 @@ namespace ElevatorRL.Editor
         static readonly MethodInfo GetObservationsMethod =
             typeof(VectorSensor).GetMethod("GetObservations", BindingFlags.NonPublic | BindingFlags.Instance);
 
+        // Diagnostic: count how often each of the 6 actions is chosen across a run. A degenerate
+        // (all-NOOP) policy shows up as everything in [0]; a working dispatcher on a functional
+        // policy shows board/move actions too. Lets us tell "policy never learned" apart from
+        // "dispatcher bug" when delivered==0. Read via ActionHistogram after a sweep.
+        public readonly long[] ActionHistogram = new long[6];
+
         public MultiAgentPpoDispatcher(ModelAsset modelAsset, int carObsSize)
         {
             var model = ModelLoader.Load(modelAsset);
@@ -69,7 +75,9 @@ namespace ElevatorRL.Editor
                 _worker.Schedule();
 
                 using var outTensor = _worker.PeekOutput("deterministic_discrete_actions") as Tensor<int>;
-                result[i] = outTensor.DownloadToArray()[0];
+                int a = outTensor.DownloadToArray()[0];
+                if (a >= 0 && a < 6) ActionHistogram[a]++;
+                result[i] = a;
             }
 
             return result;

@@ -217,6 +217,13 @@ namespace ElevatorRL.Editor
                           $"PPO delivered={ppoEp.delivered} waitMean={ppoEp.waitMean:0.0}s");
             }
 
+            if (ppoMulti != null)
+            {
+                var h = ppoMulti.ActionHistogram;
+                Debug.Log($"[Eval] {rungName} PPO action histogram (noop/up/down/boardUp/boardDown/unload): " +
+                          $"{h[0]}/{h[1]}/{h[2]}/{h[3]}/{h[4]}/{h[5]} — if all in noop, the policy is " +
+                          "degenerate (never boards), not a dispatcher bug.");
+            }
             ppoMulti?.Dispose();
             ppoFlat?.Dispose();
 

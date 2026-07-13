@@ -343,7 +343,36 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
      encodings before the shared trunk — closer to the literal "shared per-car encoder" phrasing in
      this section, but needs custom ML-Agents network code (no longer just YAML config), which is
      more implementation risk/time than option 1.
-  Decision on which path, plus the reward-shaping question in option 1, pending discussion.
+
+- **Decision (2026-07-13):** implement BOTH, both pure C# / no custom Python (planning discovery:
+  the shared-encoder network is achievable via ML-Agents' built-in BufferSensor attention, avoiding
+  the torch/ONNX-export fragility). Plan file: `peaceful-giggling-fern.md`.
+  - **Architecture A — multi-agent parameter sharing** (N per-car `ElevatorCarAgent` sharing Behavior
+    "ElevatorCar", fixed per-car obs, team reward via `BuildingManager`).
+  - **Architecture B — single-agent + BufferSensor attention** (global obs → VectorSensor, per-car
+    entities → `BufferSensorComponent` → shared per-car encoder + residual self-attention; keeps the
+    E-branch joint action). Behavior "ElevatorAttention".
+
+- **Architecture A result (run `elev-e6a-m-ppo-01`, 5M steps, rung M) — FAILED TO LEARN, but the
+  setup was mis-specified.** Training reward stayed flat at ~-21000 the entire run (started -20650,
+  ended -21190) — no learning, vs the flat MLP climbing to ~-9500 over the same budget. Eval:
+  PPO delivered **0** passengers across all 5 seeds (`Runs/20260713-154736-E3-sweep-M-e6a-UpPeak/`).
+  Root cause is almost certainly the **wrong trainer**: this used plain `trainer_type: ppo`, i.e.
+  independent PPO agents (shared weights) each treating the broadcast team reward as an individual
+  reward, with a decentralized critic that sees only one car's local obs. That's a known-weak setup
+  for *cooperative* multi-agent — ML-Agents ships **MA-POCA** (`trainer_type: poca` + a
+  `SimpleMultiAgentGroup` with `AddGroupReward`/`GroupEpisodeInterrupted`) specifically for this,
+  giving a centralized critic over the whole group. So this result is NOT a fair test of "does
+  multi-agent parameter sharing help" — it's "independent PPO on a cooperative task doesn't learn,"
+  which is expected. Redoing Architecture A with MA-POCA (agent groups + poca) is the correct test.
+  (Dispatcher-vs-policy note: delivered=0 alone could be a dispatcher bug, but the flat *training*
+  reward — which uses the real `ElevatorCarAgent`, not the eval dispatcher — is independent evidence
+  the policy itself never learned. A per-action histogram in `MultiAgentPpoDispatcher` was added to
+  confirm the dispatcher reads actions correctly; run it once the CPU is free of the B training.)
+
+- **Architecture B — training in progress** (`elev-e6b-m-ppo-01`, 5M steps, rung M). Attention is
+  ~2x slower/step than the flat MLP (~470 vs ~1050 steps/s → ~2.9h). Early curve tracks slightly
+  ahead of the flat MLP at equal steps; too early to judge.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
