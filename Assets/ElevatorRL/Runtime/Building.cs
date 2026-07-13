@@ -454,6 +454,91 @@ namespace ElevatorRL
                 sensor.AddOneHotObservation((int)ActivePattern, 5);
         }
 
+        // ---------------------------------------------------------------- per-car observation (E6)
+        // Same ObservationConfig blocks as WriteObservation, but "own car" blocks (carFloor/
+        // carActive/carButtons/carMotion/carLoads) cover only carIndex's car instead of all E cars —
+        // this is what makes the observation size independent of fleet size, which is the whole
+        // point of the multi-agent/parameter-sharing architecture (EXPERIMENT_PLAN.md E6): the same
+        // policy network works for any car count since every car agent gets an identically-shaped
+        // observation. "Shared" blocks (hall buttons/queues/time/pattern) are building-wide and
+        // identical across all car agents, same as before.
+        public int CarObservationSize()
+        {
+            int F = cfg.numFloors, s = 0;
+            if (obs.carFloor) s += F;
+            if (obs.carActive) s += 1;
+            if (obs.carButtons) s += F;
+            if (obs.hallButtons) s += 2 * F;
+            if (obs.hallCallAge) s += 2 * F;
+            if (obs.carMotion) s += 4;
+            if (obs.carLoads) s += 1;
+            if (obs.queueLengths) s += 2 * F;
+            if (obs.timeOfDay) s += 2;
+            if (obs.pattern) s += 5;
+            return s;
+        }
+
+        public void WriteCarObservation(VectorSensor sensor, int carIndex)
+        {
+            int F = cfg.numFloors;
+            var c = cars[carIndex];
+
+            if (obs.carFloor)
+            {
+                if (c.inService) sensor.AddOneHotObservation(Mathf.Clamp(c.Floor, 0, F - 1), F);
+                else for (int k = 0; k < F; k++) sensor.AddObservation(0f);
+            }
+
+            if (obs.carActive) sensor.AddObservation(c.inService ? 1f : 0f);
+
+            if (obs.carButtons)
+                for (int f = 0; f < F; f++) sensor.AddObservation(c.inService && c.WantsFloor(f) ? 1f : 0f);
+
+            if (obs.hallButtons)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(upQ[f].Count > 0 ? 1f : 0f);
+                    sensor.AddObservation(downQ[f].Count > 0 ? 1f : 0f);
+                }
+
+            if (obs.hallCallAge)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(OldestWaitFrac(upQ[f]));
+                    sensor.AddObservation(OldestWaitFrac(downQ[f]));
+                }
+
+            if (obs.carMotion)
+            {
+                if (c.inService)
+                {
+                    int m = c.state == CarState.Moving ? (c.dir > 0 ? 2 : 0) : 1;
+                    sensor.AddOneHotObservation(m, 3);
+                    sensor.AddObservation(F > 1 ? c.position / (F - 1) : 0f);
+                }
+                else { sensor.AddObservation(0f); sensor.AddObservation(0f); sensor.AddObservation(0f); sensor.AddObservation(0f); }
+            }
+
+            if (obs.carLoads) sensor.AddObservation(c.inService ? c.Load : 0f);
+
+            if (obs.queueLengths)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(Mathf.Min(1f, upQ[f].Count / (float)cfg.maxQueue));
+                    sensor.AddObservation(Mathf.Min(1f, downQ[f].Count / (float)cfg.maxQueue));
+                }
+
+            if (obs.timeOfDay)
+            {
+                float frac = traffic.DayFraction(simTime);
+                sensor.AddObservation(Mathf.Sin(2f * Mathf.PI * frac));
+                sensor.AddObservation(Mathf.Cos(2f * Mathf.PI * frac));
+            }
+
+            if (obs.pattern)
+                sensor.AddOneHotObservation((int)ActivePattern, 5);
+        }
+
         /// <summary>Longest current wait in a hall queue, normalized by maxWait (0 if empty).</summary>
         float OldestWaitFrac(List<Passenger> q)
         {

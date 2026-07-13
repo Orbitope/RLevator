@@ -14,23 +14,29 @@ namespace ElevatorRL.Editor
     public static class HeadlessBuild
     {
         const string OutputPath = "Builds/HeadlessTrainer/RLevatorTrainer.app";
+        const string MultiAgentOutputPath = "Builds/HeadlessTrainerMultiAgent/RLevatorTrainerMultiAgent.app";
 
         [MenuItem("Tools/Elevator RL/Build Headless Trainer (macOS)")]
-        public static void Build()
+        public static void Build() => BuildScene("Assets/Scenes/Training.unity", OutputPath);
+
+        [MenuItem("Tools/Elevator RL/E6 Multi-Agent/Build Headless Trainer (macOS)")]
+        public static void BuildMultiAgent() => BuildScene("Assets/Scenes/TrainingMultiAgent.unity", MultiAgentOutputPath);
+
+        static void BuildScene(string scenePath, string outputPath)
         {
             var report = BuildPipeline.BuildPlayer(
-                new[] { "Assets/Scenes/Training.unity" },
-                OutputPath,
+                new[] { scenePath },
+                outputPath,
                 BuildTarget.StandaloneOSX,
                 BuildOptions.None);
 
             var summary = report.summary;
-            UnityEngine.Debug.Log($"[ElevatorRL] Headless trainer build: {summary.result}, " +
+            UnityEngine.Debug.Log($"[ElevatorRL] Headless trainer build ({scenePath}): {summary.result}, " +
                                   $"{summary.totalErrors} errors, {summary.totalWarnings} warnings, " +
                                   $"output={summary.outputPath}");
 
             if (summary.result == BuildResult.Succeeded)
-                MarkBackgroundOnly(OutputPath);
+                MarkBackgroundOnly(outputPath);
         }
 
         // mlagents-learn --num-envs=N launches N copies of this build as plain child
