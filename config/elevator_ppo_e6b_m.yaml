@@ -1,0 +1,38 @@
+# config/elevator_ppo_e6b_m.yaml — E6 Architecture B (BufferSensor attention), rung M
+#   mlagents-learn config/elevator_ppo_e6b_m.yaml --run-id=<name>
+#
+# Behavior name "ElevatorAttention" (the single ElevatorAttentionAgent in TrainingAttention.unity).
+# Same information as the flat MLP, but the observation is split into a global VectorSensor (64
+# floats) + one per-car entity (38 floats) in a BufferSensorComponent, so ML-Agents applies a
+# SHARED per-car encoder + residual self-attention over the cars (EXPERIMENT_PLAN.md E6 /
+# plan Architecture B). The action stays a single 5-branch joint MultiDiscrete — so this keeps
+# joint action selection while gaining the permutation-invariant shared encoder + attention.
+#
+# Same PPO hyperparameters as the flat-MLP E3 runs and Architecture A (elevator_ppo_e6a_m.yaml) so
+# the only thing that varies across the E6 comparison is the architecture. Single agent → 5M steps
+# == 5M environment rounds, directly comparable to the flat-MLP E3 M runs' step budget (unlike the
+# multi-agent per-agent-step counting — see elevator_ppo_e6a_m.yaml's caveat). No curriculum.
+behaviors:
+  ElevatorAttention:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 256
+      num_layers: 2
+      normalize: true
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 5.0e6
+    time_horizon: 256
+    summary_freq: 20000
