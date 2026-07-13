@@ -539,6 +539,107 @@ namespace ElevatorRL
                 sensor.AddOneHotObservation((int)ActivePattern, 5);
         }
 
+        // ------------------------------------------------ split obs for BufferSensor attention (E6-B)
+        // Architecture B (EXPERIMENT_PLAN.md E6 / plan Architecture B) feeds the SAME information as
+        // the flat WriteObservation, but reorganized: building-wide state goes to a VectorSensor
+        // (WriteGlobalObservation) and each car becomes one fixed-size entity in a BufferSensor
+        // (WriteCarEntity). ML-Agents then runs a shared per-entity encoder + self-attention over the
+        // car entities. "Own-car" blocks (carFloor/carActive/carButtons/carMotion/carLoads) become the
+        // per-car entity; "global" blocks (hall buttons/age, queue lengths, time, pattern) are the
+        // vector obs. Together these cover exactly the same blocks as WriteObservation.
+
+        public int GlobalObservationSize()
+        {
+            int F = cfg.numFloors, s = 0;
+            if (obs.hallButtons) s += 2 * F;
+            if (obs.hallCallAge) s += 2 * F;
+            if (obs.queueLengths) s += 2 * F;
+            if (obs.timeOfDay) s += 2;
+            if (obs.pattern) s += 5;
+            return s;
+        }
+
+        public void WriteGlobalObservation(VectorSensor sensor)
+        {
+            int F = cfg.numFloors;
+
+            if (obs.hallButtons)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(upQ[f].Count > 0 ? 1f : 0f);
+                    sensor.AddObservation(downQ[f].Count > 0 ? 1f : 0f);
+                }
+
+            if (obs.hallCallAge)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(OldestWaitFrac(upQ[f]));
+                    sensor.AddObservation(OldestWaitFrac(downQ[f]));
+                }
+
+            if (obs.queueLengths)
+                for (int f = 0; f < F; f++)
+                {
+                    sensor.AddObservation(Mathf.Min(1f, upQ[f].Count / (float)cfg.maxQueue));
+                    sensor.AddObservation(Mathf.Min(1f, downQ[f].Count / (float)cfg.maxQueue));
+                }
+
+            if (obs.timeOfDay)
+            {
+                float frac = traffic.DayFraction(simTime);
+                sensor.AddObservation(Mathf.Sin(2f * Mathf.PI * frac));
+                sensor.AddObservation(Mathf.Cos(2f * Mathf.PI * frac));
+            }
+
+            if (obs.pattern)
+                sensor.AddOneHotObservation((int)ActivePattern, 5);
+        }
+
+        public int CarEntitySize()
+        {
+            int F = cfg.numFloors, s = 0;
+            if (obs.carFloor) s += F;
+            if (obs.carActive) s += 1;
+            if (obs.carButtons) s += F;
+            if (obs.carMotion) s += 4;
+            if (obs.carLoads) s += 1;
+            return s;
+        }
+
+        /// <summary>Fills <paramref name="buf"/> (length must == CarEntitySize()) with one car's entity.</summary>
+        public void WriteCarEntity(float[] buf, int carIndex)
+        {
+            int F = cfg.numFloors, o = 0;
+            var c = cars[carIndex];
+
+            if (obs.carFloor)
+            {
+                if (c.inService) buf[o + Mathf.Clamp(c.Floor, 0, F - 1)] = 1f;
+                o += F;
+            }
+
+            if (obs.carActive) { buf[o] = c.inService ? 1f : 0f; o += 1; }
+
+            if (obs.carButtons)
+            {
+                for (int f = 0; f < F; f++) buf[o + f] = c.inService && c.WantsFloor(f) ? 1f : 0f;
+                o += F;
+            }
+
+            if (obs.carMotion)
+            {
+                if (c.inService)
+                {
+                    int m = c.state == CarState.Moving ? (c.dir > 0 ? 2 : 0) : 1; // 0 down, 1 stopped, 2 up
+                    buf[o + m] = 1f;
+                    buf[o + 3] = F > 1 ? c.position / (F - 1) : 0f;
+                }
+                o += 4;
+            }
+
+            if (obs.carLoads) { buf[o] = c.inService ? c.Load : 0f; o += 1; }
+        }
+
         /// <summary>Longest current wait in a hall queue, normalized by maxWait (0 if empty).</summary>
         float OldestWaitFrac(List<Passenger> q)
         {

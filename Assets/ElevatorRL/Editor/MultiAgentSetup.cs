@@ -3,6 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Policies;
+using Unity.MLAgents.Sensors;
 
 namespace ElevatorRL.Editor
 {
@@ -91,6 +92,80 @@ namespace ElevatorRL.Editor
                       $"({buildingConfig.numFloors}fl/{buildingConfig.numElevators}cars): " +
                       $"{buildingConfig.numElevators}x ElevatorCarAgent, shared Behavior 'ElevatorCar', " +
                       $"obsSize={obsSize}, action=1 branch x 6.");
+        }
+
+        // ------------------------------------------------------------ E6 Architecture B (attention)
+        [MenuItem("Tools/Elevator RL/E6 Attention/Setup For S Preset (training)")]
+        static void SetupAttentionS() => SetupAttention("S");
+
+        [MenuItem("Tools/Elevator RL/E6 Attention/Setup For M Preset (training)")]
+        static void SetupAttentionM() => SetupAttention("M");
+
+        [MenuItem("Tools/Elevator RL/E6 Attention/Setup For L Preset (training)")]
+        static void SetupAttentionL() => SetupAttention("L");
+
+        [MenuItem("Tools/Elevator RL/E6 Attention/Setup For Z Preset (training)")]
+        static void SetupAttentionZ() => SetupAttention("Z");
+
+        [MenuItem("Tools/Elevator RL/E6 Attention/Setup For H Preset (training)")]
+        static void SetupAttentionH() => SetupAttention("H");
+
+        // Single-agent + BufferSensor attention (EXPERIMENT_PLAN.md E6 / plan Architecture B). One
+        // ElevatorController GameObject: VectorSensor = global obs (baked VectorObservationSize),
+        // BufferSensorComponent = per-car entities (ObservableSize=CarEntitySize, MaxNumObservables=
+        // numElevators), E-branch joint MultiDiscrete action. Behavior "ElevatorAttention".
+        static void SetupAttention(string presetName)
+        {
+            var buildingConfig = AssetDatabase.LoadAssetAtPath<BuildingConfig>($"{PresetDir}/{presetName}_BuildingConfig.asset");
+            if (buildingConfig == null) { Debug.LogError($"[ElevatorRL] {presetName}_BuildingConfig preset not found — run Generate Scale Ladder Presets first."); return; }
+
+            var reward = AssetDatabase.LoadAssetAtPath<RewardConfig>($"{ConfigDir}/RewardConfig.asset");
+            var obs = AssetDatabase.LoadAssetAtPath<ObservationConfig>($"{ConfigDir}/ObservationConfig.asset");
+            var traffic = AssetDatabase.LoadAssetAtPath<TrafficConfig>($"{ConfigDir}/TrafficConfig.asset");
+            if (reward == null || obs == null || traffic == null)
+            {
+                Debug.LogError("[ElevatorRL] RewardConfig/ObservationConfig/TrafficConfig not found — " +
+                                "run Tools > Elevator RL > Setup Scene once first to generate them.");
+                return;
+            }
+
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) go = new GameObject("ElevatorController");
+
+            var agent = go.GetComponent<ElevatorAttentionAgent>();
+            if (agent == null) agent = go.AddComponent<ElevatorAttentionAgent>();
+            agent.buildingConfig = buildingConfig;
+            agent.rewardConfig = reward;
+            agent.observationConfig = obs;
+            agent.trafficConfig = traffic;
+
+            var tempBuilding = new Building(buildingConfig, reward, obs, traffic, 1);
+            int globalObsSize = tempBuilding.GlobalObservationSize();
+            int carEntitySize = tempBuilding.CarEntitySize();
+
+            var buffer = go.GetComponent<BufferSensorComponent>();
+            if (buffer == null) buffer = go.AddComponent<BufferSensorComponent>();
+            buffer.SensorName = "CarEntities";
+            buffer.ObservableSize = carEntitySize;
+            buffer.MaxNumObservables = buildingConfig.numElevators;
+
+            int E = buildingConfig.numElevators;
+            var branches = new int[E];
+            for (int i = 0; i < E; i++) branches[i] = 6;
+
+            var bp = go.GetComponent<BehaviorParameters>();
+            if (bp == null) bp = go.AddComponent<BehaviorParameters>();
+            bp.BehaviorName = "ElevatorAttention";
+            bp.BehaviorType = BehaviorType.Default;
+            bp.BrainParameters.ActionSpec = ActionSpec.MakeDiscrete(branches);
+            bp.BrainParameters.VectorObservationSize = globalObsSize;
+
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log($"[ElevatorRL] E6 attention scene set up for {presetName} " +
+                      $"({buildingConfig.numFloors}fl/{E}cars): ElevatorAttentionAgent, Behavior " +
+                      $"'ElevatorAttention', globalObs={globalObsSize}, carEntity={carEntitySize} x{E} " +
+                      $"(BufferSensor), action={E} branches x 6.");
         }
     }
 }

@@ -15,12 +15,16 @@ namespace ElevatorRL.Editor
     {
         const string OutputPath = "Builds/HeadlessTrainer/RLevatorTrainer.app";
         const string MultiAgentOutputPath = "Builds/HeadlessTrainerMultiAgent/RLevatorTrainerMultiAgent.app";
+        const string AttentionOutputPath = "Builds/HeadlessTrainerAttention/RLevatorTrainerAttention.app";
 
         [MenuItem("Tools/Elevator RL/Build Headless Trainer (macOS)")]
         public static void Build() => BuildScene("Assets/Scenes/Training.unity", OutputPath);
 
         [MenuItem("Tools/Elevator RL/E6 Multi-Agent/Build Headless Trainer (macOS)")]
         public static void BuildMultiAgent() => BuildScene("Assets/Scenes/TrainingMultiAgent.unity", MultiAgentOutputPath);
+
+        [MenuItem("Tools/Elevator RL/E6 Attention/Build Headless Trainer (macOS)")]
+        public static void BuildAttention() => BuildScene("Assets/Scenes/TrainingAttention.unity", AttentionOutputPath);
 
         static void BuildScene(string scenePath, string outputPath)
         {
