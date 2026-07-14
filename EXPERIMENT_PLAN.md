@@ -417,22 +417,37 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   (2026-07-13) about whether a bigger flat MLP is a fair alternative to a new architecture. Not
   concluding this until Architecture A-poca's result is in.
 
-- **Architecture A MA-POCA retrain — planned, not yet started.** `BuildingManager.cs` was already
-  converted to `SimpleMultiAgentGroup`/`AddGroupReward`/`GroupEpisodeInterrupted` (commit `3416aad`)
-  and `config/elevator_poca_e6a_m.yaml` (`trainer_type: poca`) is ready, but the existing headless
-  build under `Builds/HeadlessTrainerMultiAgent/` predates that commit (built 15:13, code committed
-  15:58) and must be rebuilt before training. Concrete next steps, queued for whoever resumes this:
-  1. Recompile in Unity, confirm 0 errors on the MA-POCA `BuildingManager.cs` (never compiled yet).
-  2. Rebuild via `Tools/Elevator RL/E6 Multi-Agent/Build Headless Trainer (macOS)`.
-  3. Smoke test (`-batchmode -nographics`, ~8s) before committing to a full run.
-  4. `scripts/start_training.sh elev-e6a-m-poca-01 config/elevator_poca_e6a_m.yaml Builds/HeadlessTrainerMultiAgent/RLevatorTrainerMultiAgent.app 20 M`
-     (renamed run-id from the earlier `elev-e6a-poca-m-ppo-01` — that name said "ppo" which is wrong
-     now that it's poca). Watch the training-reward curve shape; if still climbing at 5M like B was,
-     extend to 10M via `resume_training.sh` + a new `elevator_poca_e6a_m_10m.yaml`, same pattern as B.
-  5. Eval via `MultiAgentPpoDispatcher` (`RunE6ASweepM` menu item, already wired) — and this time
+- **Architecture A MA-POCA retrain, attempt 1 (`elev-e6a-m-poca-01`) — FAILED, second
+  mis-specification found.** Rebuilt and trained for 5M steps: eval sweep again showed **PPO
+  delivered 0 across all 5 seeds**, identical to the original broken independent-PPO attempt.
+  Training logs showed `Mean Reward: 0.000` at every one of 223 summary points across the entire
+  run, despite `Mean Group Reward` swinging normally (~-20,000 to -22,000) and hundreds of episodes
+  completing (ruling out "no episodes finished yet"). Root cause: the MA-POCA conversion
+  (`3416aad`) called only `_group.AddGroupReward()`, never `agent.AddReward()` on the individual
+  `ElevatorCarAgent`s. Per ML-Agents' own docs this is correct in principle ("group rewards are
+  treated differently... not equivalent to calling AddReward() on each agent"), but in practice the
+  individual agents were receiving **zero reward signal of any kind** — every one of their own
+  per-agent value/advantage estimates had nothing to learn from, likely starving policy learning
+  even with a working centralized critic. Fixed (commit `f1eb88f`) by also crediting each in-service
+  car with `AddReward(groupReward / numCars)` alongside the existing group reward. Verified the fix
+  with a 100k-step smoke test before committing to a full run: `Mean Reward` now tracks
+  `Mean Group Reward / 5` almost exactly (e.g. -4070.8 vs -20354.1/5 = -4070.8), confirming the
+  wiring is correct this time. (Process note: also hit two infra snags worth flagging for next
+  time — a build ran before an in-flight recompile had actually finished, silently baking stale
+  code into the headless player; and Unity's MCP bridge stops processing incoming requests entirely
+  when the Editor isn't the frontmost app on macOS, requiring an explicit
+  `osascript ... set frontmost of process "Unity" to true` before menu-item calls would go through.)
+
+- **Architecture A MA-POCA retrain, attempt 2 (`elev-e6a-m-poca-01-v2`) — in progress.** Relaunched
+  the full 5M-step run with the per-agent-reward fix. Next steps once complete:
+  1. Watch the training-reward curve shape; if still climbing at 5M like B was, extend to 10M via
+     `resume_training.sh` + a new `elevator_poca_e6a_m_10m.yaml`, same pattern as B.
+  2. Eval via `MultiAgentPpoDispatcher` (`RunE6ASweepM` menu item, already wired) — and this time
      actually read out `MultiAgentPpoDispatcher.ActionHistogram` (added specifically to rule out a
      dispatcher bug vs. a degenerate policy; has never once been checked).
-  6. Update this section with A-poca's result and finalize the E6 winner/conclusion.
+  3. Update this section with A-poca's result and finalize the E6 winner/conclusion. If this still
+     doesn't beat the flat MLP, the user's fallback plan is to test a bigger flat MLP (more
+     hidden_units/num_layers) rather than continuing to chase the MARL architecture.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
