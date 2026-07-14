@@ -370,9 +370,16 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   the policy itself never learned. A per-action histogram in `MultiAgentPpoDispatcher` was added to
   confirm the dispatcher reads actions correctly; run it once the CPU is free of the B training.)
 
-- **Architecture B — training in progress** (`elev-e6b-m-ppo-01`, 5M steps, rung M). Attention is
-  ~2x slower/step than the flat MLP (~470 vs ~1050 steps/s → ~2.9h). Early curve tracks slightly
-  ahead of the flat MLP at equal steps; too early to judge.
+- **Architecture B 5M-step result** (`elev-e6b-m-ppo-01`, rung M) — reward climbed from -26,800
+  (step 40k) to -10,835 (step 5,000,192) but was still visibly inching up in the last ~1M steps
+  (-11.2k → -10.7k, noisy but not flat), the same "still learning, not a capacity ceiling" curve
+  shape as the flat-MLP M run before its 5M→10M extension. -10,835 is worse than the flat MLP's
+  ~-9500 at 5M, but far ahead of Architecture A's failed flat -21,000. Per the same
+  cheap-test-first logic as E3 (extend steps before touching network size), resumed the identical
+  run to 10M steps via `scripts/resume_training.sh` + `config/elevator_ppo_e6b_m_10m.yaml`
+  (resumed cleanly from step 5,000,192, snapshot at
+  `Runs/training/elev-e6b-m-ppo-01/resume_20260714T011221Z/`). Awaiting the extended result before
+  judging Architecture B against the flat-MLP baseline.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
