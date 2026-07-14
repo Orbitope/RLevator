@@ -77,10 +77,17 @@ namespace ElevatorRL
             _clock -= buildingConfig.decisionInterval;
             _b.StepServiceChanges();
 
-            // Cooperative team reward to the whole group (MA-POCA centralized critic), not per-agent.
-            _group.AddGroupReward(_b.CollectReward());
+            // Cooperative team reward to the whole group (MA-POCA centralized critic).
+            // MA-POCA requires both group reward (for the critic) and per-agent rewards.
+            // Distribute the shared building reward equally to all agents.
+            float r = _b.CollectReward();
+            _group.AddGroupReward(r);
+            float perAgentReward = r / _carAgents.Length;
             for (int i = 0; i < _carAgents.Length; i++)
+            {
+                _carAgents[i].AddReward(perAgentReward);
                 if (_carAgents[i].IsEligible()) _carAgents[i].RequestDecision();
+            }
 
             _decisions++;
             if (episodeDecisionLimit > 0 && _decisions >= episodeDecisionLimit)
