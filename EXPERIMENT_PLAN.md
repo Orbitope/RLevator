@@ -378,8 +378,61 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   cheap-test-first logic as E3 (extend steps before touching network size), resumed the identical
   run to 10M steps via `scripts/resume_training.sh` + `config/elevator_ppo_e6b_m_10m.yaml`
   (resumed cleanly from step 5,000,192, snapshot at
-  `Runs/training/elev-e6b-m-ppo-01/resume_20260714T011221Z/`). Awaiting the extended result before
-  judging Architecture B against the flat-MLP baseline.
+  `Runs/training/elev-e6b-m-ppo-01/resume_20260714T011221Z/`).
+
+- **Architecture B 10M-step result — training reward climbed to ~-9,948 (step 10,000,128), touching
+  the flat-MLP's range** but the **eval sweep tells a different story**. Built `AttentionDispatcher`
+  (`Assets/ElevatorRL/Editor/AttentionDispatcher.cs`) for eval — confirmed the exported ONNX's actual
+  input contract directly via `onnx.load` (not assumed): `obs_0` is the BufferSensor entity tensor
+  `(batch, 5, 38)`, `obs_1` is the global VectorSensor `(batch, 64)` — BufferSensorComponent registers
+  before the Agent's own VectorSensor, so the indices are swapped from CollectObservations' call
+  order. Ran the standard 5-seed UpPeak sweep
+  (`Runs/20260713-205532-E3-sweep-M-e6b-10M-UpPeak/sweep_summary.csv`):
+
+  | Policy              | delivered (mean/5 seeds) | vs LOOK/ETA |
+  |----------------------|---------------------------|-------------|
+  | LOOK                 | 2119.2                    | baseline    |
+  | ETA                  | 2109.8                    | baseline    |
+  | Flat-MLP, 5M steps   | 1590.4                    | -25%        |
+  | Flat-MLP, 10M steps  | 1958.4                    | -8%         |
+  | **Architecture B (attention), 10M steps** | **1406.2**   | **-34%**    |
+  | Architecture A (independent PPO, mis-specified) | 0 | -100% (broken, see above) |
+
+  **Architecture B loses to the flat MLP at equal (10M) step budget — and loses to the flat MLP's
+  5M-step result too.** Despite reaching a similar *training* cumulative reward (~-9,948 vs the flat
+  MLP's ~+2,500–3,500 eval `rwTotal` at 10M — note training reward and eval `rwTotal` aren't the same
+  metric/episode length, but the eval numbers are the fair apples-to-apples comparison), attention
+  delivers meaningfully fewer passengers with much higher abandonment (~1000-1100 vs LOOK's ~400-460).
+  This is the opposite of the motivating hypothesis for E6 — the "shared-encoder + attention"
+  architecture, despite the more sophisticated inductive bias, has not translated into better
+  dispatch quality than the plain flat MLP at this size, at least not within the same 10M-step
+  budget (attention trains ~2x slower per step, so it has effectively seen less optimization per
+  wall-clock than the flat MLP already had going into this comparison).
+
+  **Conclusion so far: neither new architecture beats the flat-MLP baseline at rung M.** Architecture
+  A's MA-POCA retrain (queued, not yet run — see below) is still an open question; if it also fails
+  to beat the flat MLP, the honest read is that rung M's real bottleneck may be step budget /
+  reward-shaping rather than architecture, and the cheaper "flat MLP with more capacity" experiment
+  the user raised becomes the more promising next lever — see the check-in discussion in-session
+  (2026-07-13) about whether a bigger flat MLP is a fair alternative to a new architecture. Not
+  concluding this until Architecture A-poca's result is in.
+
+- **Architecture A MA-POCA retrain — planned, not yet started.** `BuildingManager.cs` was already
+  converted to `SimpleMultiAgentGroup`/`AddGroupReward`/`GroupEpisodeInterrupted` (commit `3416aad`)
+  and `config/elevator_poca_e6a_m.yaml` (`trainer_type: poca`) is ready, but the existing headless
+  build under `Builds/HeadlessTrainerMultiAgent/` predates that commit (built 15:13, code committed
+  15:58) and must be rebuilt before training. Concrete next steps, queued for whoever resumes this:
+  1. Recompile in Unity, confirm 0 errors on the MA-POCA `BuildingManager.cs` (never compiled yet).
+  2. Rebuild via `Tools/Elevator RL/E6 Multi-Agent/Build Headless Trainer (macOS)`.
+  3. Smoke test (`-batchmode -nographics`, ~8s) before committing to a full run.
+  4. `scripts/start_training.sh elev-e6a-m-poca-01 config/elevator_poca_e6a_m.yaml Builds/HeadlessTrainerMultiAgent/RLevatorTrainerMultiAgent.app 20 M`
+     (renamed run-id from the earlier `elev-e6a-poca-m-ppo-01` — that name said "ppo" which is wrong
+     now that it's poca). Watch the training-reward curve shape; if still climbing at 5M like B was,
+     extend to 10M via `resume_training.sh` + a new `elevator_poca_e6a_m_10m.yaml`, same pattern as B.
+  5. Eval via `MultiAgentPpoDispatcher` (`RunE6ASweepM` menu item, already wired) — and this time
+     actually read out `MultiAgentPpoDispatcher.ActionHistogram` (added specifically to rule out a
+     dispatcher bug vs. a degenerate policy; has never once been checked).
+  6. Update this section with A-poca's result and finalize the E6 winner/conclusion.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet

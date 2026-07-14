@@ -170,6 +170,15 @@ namespace ElevatorRL.Editor
         static void RunE6ASweepM() => RunScaleLadderSweep("M-e6a", 16, 5, 8,
             "Assets/ElevatorRL/Models/ElevatorController_M_e6a.onnx", obsSize: 102, multiAgent: true);
 
+        // EXPERIMENT_PLAN.md E6 Architecture B (BufferSensor attention), 10M-step run. obsSize is
+        // unused for this dispatcher (AttentionDispatcher takes globalObsSize/carEntitySize/
+        // maxNumObservables directly instead) but RunScaleLadderSweep still wants a value for its
+        // shared signature; pass globalObsSize as a harmless placeholder.
+        [MenuItem("Tools/Elevator RL/E6 Attention/Run Sweep (LOOK vs ETA vs PPO-attention, rung M, 10M steps, seeds 1-5)")]
+        static void RunE6BSweepM10M() => RunScaleLadderSweep("M-e6b-10M", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorAttention_M_e6b_10m.onnx", obsSize: 64,
+            attention: true, globalObsSize: 64, carEntitySize: 38, maxNumObservables: 5);
+
         // EXPERIMENT_PLAN.md E3: same LOOK/ETA/PPO comparison as E2, generalized across the scale
         // ladder. NOTE intensity is still the fixed SmokeIntensity (0.5), matching E2's methodology
         // for apples-to-apples continuity — NOT each rung's calibrated saturation point (§3: S≈1.33,
@@ -178,7 +187,8 @@ namespace ElevatorRL.Editor
         // multiAgent=true uses the E6-A per-car shared policy (MultiAgentPpoDispatcher) and treats
         // obsSize as the per-car observation size; false uses the flat single-agent PpoDispatcher.
         static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
-            string modelPath, int obsSize, bool multiAgent = false)
+            string modelPath, int obsSize, bool multiAgent = false, bool attention = false,
+            int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
             const TrafficPattern pattern = TrafficPattern.UpPeak;
@@ -191,8 +201,9 @@ namespace ElevatorRL.Editor
                 return;
             }
             var ppoMulti = multiAgent ? new MultiAgentPpoDispatcher(modelAsset, obsSize) : null;
-            var ppoFlat = multiAgent ? null : new PpoDispatcher(modelAsset, obsSize);
-            Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : ppoFlat.Dispatch;
+            var ppoAttn = attention ? new AttentionDispatcher(modelAsset, globalObsSize, carEntitySize, maxNumObservables) : null;
+            var ppoFlat = (multiAgent || attention) ? null : new PpoDispatcher(modelAsset, obsSize);
+            Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : attention ? ppoAttn.Dispatch : ppoFlat.Dispatch;
 
             var rows = new List<string> {
                 "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
@@ -225,6 +236,7 @@ namespace ElevatorRL.Editor
                           "degenerate (never boards), not a dispatcher bug.");
             }
             ppoMulti?.Dispose();
+            ppoAttn?.Dispose();
             ppoFlat?.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
