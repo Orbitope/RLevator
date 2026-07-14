@@ -1,0 +1,35 @@
+# config/elevator_ppo_e3_m_bignet.yaml — flat-MLP rung M, bigger network (EXPERIMENT_PLAN.md E6)
+#   mlagents-learn config/elevator_ppo_e3_m_bignet.yaml --run-id=<name>
+#
+# After both new E6 architectures (A: multi-agent parameter sharing, B: BufferSensor attention)
+# failed to beat the flat-MLP baseline at rung M -- and Architecture A turned out to have a
+# structural flaw (per-car agents can't see other cars' state at all, so coordination is
+# impossible regardless of trainer) -- the cheaper next lever is just giving the ORIGINAL flat
+# MLP more capacity, per the user's explicit fallback instruction. Same architecture/obs/action as
+# elevator_ppo_e3_m.yaml (hidden_units: 256, num_layers: 2, 5M steps, delivered ~1590/5000 vs
+# LOOK/ETA's ~2115), just bigger: 512 hidden units, 3 layers. Everything else identical so network
+# size is the only variable in this comparison.
+behaviors:
+  ElevatorController:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 512
+      num_layers: 3
+      normalize: true
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 5.0e6
+    time_horizon: 256
+    summary_freq: 20000

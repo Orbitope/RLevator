@@ -438,16 +438,39 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   when the Editor isn't the frontmost app on macOS, requiring an explicit
   `osascript ... set frontmost of process "Unity" to true` before menu-item calls would go through.)
 
-- **Architecture A MA-POCA retrain, attempt 2 (`elev-e6a-m-poca-01-v2`) — in progress.** Relaunched
-  the full 5M-step run with the per-agent-reward fix. Next steps once complete:
-  1. Watch the training-reward curve shape; if still climbing at 5M like B was, extend to 10M via
-     `resume_training.sh` + a new `elevator_poca_e6a_m_10m.yaml`, same pattern as B.
-  2. Eval via `MultiAgentPpoDispatcher` (`RunE6ASweepM` menu item, already wired) — and this time
-     actually read out `MultiAgentPpoDispatcher.ActionHistogram` (added specifically to rule out a
-     dispatcher bug vs. a degenerate policy; has never once been checked).
-  3. Update this section with A-poca's result and finalize the E6 winner/conclusion. If this still
-     doesn't beat the flat MLP, the user's fallback plan is to test a bigger flat MLP (more
-     hidden_units/num_layers) rather than continuing to chase the MARL architecture.
+- **Architecture A MA-POCA retrain, attempt 2 (`elev-e6a-m-poca-01-v2`) — STOPPED at 2.4M/5M
+  steps, structural flaw found in the observation design, not the trainer.** With the per-agent
+  reward fix confirmed active (`Mean Reward` non-zero and tracking `Mean Group Reward / 5`), the
+  training reward was still completely flat over the first 2.4M steps (-4050 to -4250 per-agent,
+  ~-20,700 to -22,100 group, noisy but no upward trend at all — contrast the flat MLP's climb from
+  ~-20,000 to ~-9,500 over the same budget). Two independently-broken trainer setups (plain PPO,
+  then POCA with corrected reward routing) producing the *identical* flat-non-learning signature
+  pointed at something upstream of the trainer. Reading `Building.WriteCarObservation`
+  (`Assets/ElevatorRL/Runtime/Building.cs:481-540`) found it: **each `ElevatorCarAgent` only
+  observes its own car's state (floor/motion/load/buttons) plus building-wide shared info (hall
+  calls, queues, time, pattern) — it has zero visibility into any *other* car's position, motion,
+  or load.** Elevator dispatch is inherently a coordination problem (which car should answer a hall
+  call depends on where the other cars already are), so no trainer can teach coordination an agent
+  structurally cannot perceive. This is exactly the concern the user raised at the very start of E6
+  ("the architecture doesn't have enough information available to learn such a large building
+  setup") — Architecture A's per-car design, specifically, reintroduced that problem even though
+  Architecture B (which does give every car full visibility into its peers via BufferSensor
+  entities) does not have this flaw and was still tested to a clean result. **Architecture A is not
+  being retried further** — fixing it would mean adding all-other-cars' state to each car's
+  observation, which starts to erode the "fixed per-car obs size independent of fleet" property
+  that was the whole point of the parameter-sharing design, and Architecture B already tested the
+  "give every car full peer visibility" idea via a different (better-suited) mechanism and still
+  lost to the flat MLP.
+
+- **Pivot: bigger flat MLP (`elev-e3-m-bignet-01`), per the user's fallback instruction — in
+  progress.** With both new E6 architectures either losing to the flat-MLP baseline (B) or
+  structurally incapable of learning at all (A), the cheaper next lever is more capacity on the
+  ORIGINAL flat MLP rather than continuing to invent new architectures. `config/elevator_ppo_e3_m_bignet.yaml`
+  — identical to `elevator_ppo_e3_m.yaml` (which scored ~1590/5000 delivered at 5M steps) except
+  `hidden_units: 256→512`, `num_layers: 2→3`. Same build/scene as the existing flat-MLP path
+  (`Builds/HeadlessTrainer/RLevatorTrainer.app`), 5M steps, rung M. Next steps: watch the curve,
+  eval via the existing `PpoDispatcher`/`RunE3SweepM`-style sweep, compare delivered count against
+  flat-MLP-256×2 (5M: ~1590, 10M: ~1958) and LOOK/ETA (~2115).
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
