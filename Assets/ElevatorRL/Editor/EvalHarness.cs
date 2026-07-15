@@ -162,6 +162,14 @@ namespace ElevatorRL.Editor
         static void RunE3SweepM10M() => RunScaleLadderSweep("M-10M", 16, 5, 8,
             "Assets/ElevatorRL/Models/ElevatorController_M_e3_10m.onnx", obsSize: 254);
 
+        // EXPERIMENT_PLAN.md E6 pivot: bigger flat MLP (512 hidden units x 3 layers, up from 256x2)
+        // after both new architectures failed to beat the original flat-MLP baseline. Same obs/action
+        // as the other flat-MLP M sweeps (only network_settings changed in training config), so
+        // obsSize is unchanged at 254.
+        [MenuItem("Tools/Elevator RL/Run E3 Sweep (LOOK vs ETA vs PPO, rung M, bigger net, seeds 1-5)")]
+        static void RunE3SweepMBignet() => RunScaleLadderSweep("M-bignet", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e3_bignet.onnx", obsSize: 254);
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),

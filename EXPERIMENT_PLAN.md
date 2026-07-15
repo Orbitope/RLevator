@@ -462,15 +462,42 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   "give every car full peer visibility" idea via a different (better-suited) mechanism and still
   lost to the flat MLP.
 
-- **Pivot: bigger flat MLP (`elev-e3-m-bignet-01`), per the user's fallback instruction — in
-  progress.** With both new E6 architectures either losing to the flat-MLP baseline (B) or
-  structurally incapable of learning at all (A), the cheaper next lever is more capacity on the
-  ORIGINAL flat MLP rather than continuing to invent new architectures. `config/elevator_ppo_e3_m_bignet.yaml`
-  — identical to `elevator_ppo_e3_m.yaml` (which scored ~1590/5000 delivered at 5M steps) except
-  `hidden_units: 256→512`, `num_layers: 2→3`. Same build/scene as the existing flat-MLP path
-  (`Builds/HeadlessTrainer/RLevatorTrainer.app`), 5M steps, rung M. Next steps: watch the curve,
-  eval via the existing `PpoDispatcher`/`RunE3SweepM`-style sweep, compare delivered count against
-  flat-MLP-256×2 (5M: ~1590, 10M: ~1958) and LOOK/ETA (~2115).
+- **Pivot: bigger flat MLP (`elev-e3-m-bignet-01`) — RESULT: capacity was indeed a real factor,
+  and a cheap one to buy.** `config/elevator_ppo_e3_m_bignet.yaml` — identical to
+  `elevator_ppo_e3_m.yaml` except `hidden_units: 256→512`, `num_layers: 2→3`. Training reward
+  outpaced the original network at every checkpoint sampled (step 2.0M: -12,300 vs original's
+  -14,900; step 4.0M: -7,700 vs -10,800), finishing 5M steps at **-7,290** vs the original's
+  **~-9,500**. Eval sweep (5 seeds, UpPeak,
+  `Runs/20260714-182608-E3-sweep-M-bignet-UpPeak/sweep_summary.csv`) confirms this in delivered
+  count, not just reward:
+
+  | Policy                          | delivered (mean/5 seeds) | vs LOOK/ETA |
+  |----------------------------------|---------------------------|-------------|
+  | LOOK                             | 2119.2                    | baseline    |
+  | ETA                              | 2109.8                    | baseline    |
+  | Flat-MLP 256×2, 5M steps         | 1590.4                    | -25%        |
+  | **Flat-MLP 512×3 ("bignet"), 5M steps** | **1929.6**          | **-9%**     |
+  | Flat-MLP 256×2, 10M steps        | 1958.4                    | -8%         |
+  | Architecture B (attention), 10M steps | 1406.2               | -34%        |
+  | Architecture A (both attempts)  | 0                          | -100% (structurally broken, see above) |
+
+  **The bigger network hits nearly the same delivered count at 5M steps (1929.6) that the original
+  256×2 network needed a full extra 5M steps to reach (1958.4 at 10M)** — i.e. more capacity bought
+  roughly the same result in about half the training budget, which is a materially better
+  cost/benefit than "just train longer" and dramatically better than either new architecture tried
+  in E6. This is the strongest evidence yet that rung M's flat-MLP gap vs. LOOK/ETA was at least
+  partly a genuine capacity limit, not solely an inductive-bias/architecture problem — reinforcing
+  the user's original instinct when this pivot was proposed.
+
+  **Follow-up, in progress:** reward was still improving at the 5M cutoff (not clearly plateaued:
+  -7,700 → -7,300 over the last ~1M steps), so extended the identical run to 10M steps via
+  `scripts/resume_training.sh` + `config/elevator_ppo_e3_m_bignet_10m.yaml` (run continuing as
+  `elev-e3-m-bignet-01`, resumed cleanly from step 5,000,192 — snapshot at
+  `Runs/training/elev-e3-m-bignet-01/resume_20260715T012223Z/`). If bignet-10M closes the remaining
+  ~9% gap to LOOK/ETA or gets close, that's a strong signal to try an even bigger network next
+  (more hidden units and/or layers) as the most promising remaining lever for rung M — and
+  potentially for resuming the E3 ladder (L/Z/H) directly on a bigger flat MLP rather than either
+  of the E6 architectures.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
