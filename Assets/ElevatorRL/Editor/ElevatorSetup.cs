@@ -75,6 +75,37 @@ namespace ElevatorRL.Editor
                       $"({preset.numFloors}fl/{preset.numElevators}cars, randomizeActive={preset.randomizeActive})");
         }
 
+        // EXPERIMENT_PLAN.md E5 (observation ablations): swap ElevatorController's
+        // observationConfig without touching buildingConfig, then rebake VectorObservationSize
+        // (which changes with the obs block toggles) the same way PointAgentAtPreset does for
+        // fleet-size changes.
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Full-State Obs Config")]
+        static void PointAgentAtObsFullState() => PointAgentAtObsConfig("ObservationConfig_FullState");
+
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Realistic Obs Config")]
+        static void PointAgentAtObsRealistic() => PointAgentAtObsConfig("ObservationConfig_Realistic");
+
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Realistic+WaitAge Obs Config")]
+        static void PointAgentAtObsRealisticPlusWaitAge() => PointAgentAtObsConfig("ObservationConfig_RealisticPlusWaitAge");
+
+        static void PointAgentAtObsConfig(string assetName)
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
+            var agent = go.GetComponent<ElevatorControllerAgent>();
+            if (agent == null) { Debug.LogError("[ElevatorRL] ElevatorController has no ElevatorControllerAgent component."); return; }
+
+            string path = $"{AssetFolder}/{assetName}.asset";
+            var cfg = AssetDatabase.LoadAssetAtPath<ObservationConfig>(path);
+            if (cfg == null) { Debug.LogError($"[ElevatorRL] {path} not found."); return; }
+
+            agent.observationConfig = cfg;
+            ConfigureBrainParameters(go, agent);
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log($"[ElevatorRL] ElevatorController.observationConfig -> {path}");
+        }
+
         /// <summary>
         /// Bakes BehaviorParameters.BrainParameters.ActionSpec/VectorObservationSize into the
         /// SAVED SCENE at editor time, computed from whatever configs are currently assigned to
