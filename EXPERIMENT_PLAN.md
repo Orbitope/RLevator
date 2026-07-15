@@ -262,7 +262,7 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   mechanism §0 describes. Single-run caveat: one training seed so far (`elev-e2-s-ppo-01`); the
   5-seed sweep above is on the *eval* side only, not repeated training runs.
 
-### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — PAUSED after S, M; resume on E6's winning bigger-flat-MLP recipe (see E6)
+### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — PAUSED after S, M; NEXT: resume ladder (rung L) on E6's winning bignet2 (768×4) recipe, which matches LOOK/ETA at M (see E6)
 - **Q:** Does the RL−LOOK performance gap grow along S→M→L→Z→H?
 - **Arms:** LOOK, (ETA), PPO-best-architecture, per rung.
 - **Metric:** relative improvement in avg wait / p95 wait / abandonment vs. LOOK, plotted **as a
@@ -315,7 +315,7 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   "realistic"} vs {+ wait-age}. Cheap: config-only, no code.
 - **Metric:** convergence performance per obs set; expect wait-age to matter most on Z/H.
 
-### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP wins; both new architectures rejected**
+### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP matches LOOK/ETA; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
 - **Arms:** flat MLP (baseline), shared per-car encoder, attention.
 - **Metric:** performance & sample-efficiency on L and H; this is where scalability is won or lost.
@@ -325,10 +325,10 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   impossible regardless of trainer) — rejected, not fixable without eroding the design's point.
   Architecture B (BufferSensor attention) trained fine but lost to the flat-MLP baseline at every
   step budget tried. The winning move was the cheap one: just give the *original* flat MLP more
-  capacity (512×3 vs 256×2). At 10M steps it delivers 2031.8/5000 vs LOOK/ETA's ~2115 (**-4%**,
-  the closest any RL policy has come across this whole investigation) vs the original network's
-  -8% at the same budget. See the full comparison table and next-step recommendation near the end
-  of this section.
+  capacity. Three sizes at 10M steps trace a clean improvement curve — 256×2: -8%, 512×3: -4%,
+  **768×4 ("bignet2"): -0.4% vs LOOK, actually beats ETA (2110.6 vs 2109.8 delivered)** — RL
+  **matches the classical heuristics at rung M** for the first time in this project. See the full
+  comparison table and updated next-step plan near the end of this section.
 - **2026-07-13 — paused E3's S→H ladder here.** M's flat-MLP result (5M steps: PPO badly behind
   LOOK/ETA; 10M steps: closed most but not all of the gap) shows the single-agent/flat-observation
   architecture is running out of information/capacity to coordinate 5 cars, and L (8 cars) would
@@ -540,12 +540,45 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   bignet-1 showed at its own 5M mark), so extended to 10M via `scripts/resume_training.sh` +
   `config/elevator_ppo_e3_m_bignet2_10m.yaml` (resumed cleanly from step 5,000,192).
 
-- **Agreed follow-on sequence (2026-07-14):** (1) **E6-bignet2** above; (2) **E5** — observation
-  ablations (cheap, config-only); (3) **E10** — reward shaping ablations (wait-min, in-car-time-min,
-  average-vs-longest-wait via a quadratic wait penalty, throughput-only control, abandonment-averse
-  — see E10 below for the full arm list); (4) **E11** — revisit Architecture B (attention) with
-  lessons learned, since losing to bignet doesn't necessarily mean attention is a dead end for this
-  problem, just that this particular setup/budget lost this particular comparison.
+- **E6-bignet2 10M-step result — RL matches LOOK/ETA at rung M for the first time in this entire
+  project.** Finished cleanly at step 10,000,000, reward -5,298 (vs bignet-1's final -5,713, and
+  consistently ahead of bignet-1 at every equivalent step past 5M — e.g. -6,387 vs -6,871 at
+  6.76M). Eval sweep
+  (`Runs/20260715-023432-E3-sweep-M-bignet2-10M-UpPeak/sweep_summary.csv`):
+
+  | Policy                                    | delivered (mean/5 seeds) | vs LOOK/ETA |
+  |---------------------------------------------|---------------------------|-------------|
+  | LOOK                                         | 2119.2                    | baseline    |
+  | ETA                                          | 2109.8                    | baseline    |
+  | Flat-MLP 256×2, 5M                           | 1590.4                    | -25%        |
+  | Flat-MLP 512×3 ("bignet"), 5M                | 1929.6                    | -9%         |
+  | Flat-MLP 256×2, 10M                          | 1958.4                    | -8%         |
+  | Flat-MLP 512×3 ("bignet"), 10M               | 2031.8                    | -4%         |
+  | **Flat-MLP 768×4 ("bignet2"), 10M**          | **2110.6**                | **-0.4%, beats ETA** |
+  | Architecture B (attention), 10M              | 1406.2                    | -34%        |
+  | Architecture A (both attempts)               | 0                          | -100% (structurally broken) |
+
+  Individual seeds show PPO essentially tied with LOOK on 4/5 seeds (2134/2134, 2161/2161,
+  2107/2122, 2095/2122) and ahead of ETA on all 5. Waits run slightly longer on average
+  (`waitMean` ~20s vs LOOK/ETA's ~17s) but abandonment is markedly *lower* (290-374 vs LOOK/ETA's
+  ~390-466) — the policy is trading a bit of average wait for fewer people giving up entirely,
+  which nets out to matching total throughput. **This closes out the capacity-scaling question
+  definitively**: three network sizes (256×2, 512×3, 768×4) at 10M steps trace a clean, still-not-
+  fully-saturated improvement curve (-8% → -4% → -0.4%), confirming the user's original hypothesis
+  that rung M's flat-MLP shortfall was capacity, not architecture.
+
+- **Agreed follow-on sequence (2026-07-14), updated after bignet2's result:** bignet2 essentially
+  closed the rung-M gap, so per the plan's original E6 step 4, the natural next move is **resuming
+  the E3 scale ladder (rung L, then Z, then H) directly on the bignet2 (768×4) recipe** rather than
+  continuing to chase marginal gains at rung M with an even bigger network — rung M is no longer
+  the bottleneck. Remaining queued items, now reordered: (1) **resume E3 ladder** on bignet2's
+  recipe (rung L next); (2) **E5** — observation ablations (cheap, config-only); (3) **E10** —
+  reward shaping ablations (wait-min, in-car-time-min, average-vs-longest-wait via a quadratic wait
+  penalty, throughput-only control, abandonment-averse — see E10 below for the full arm list); (4)
+  **E11** — revisit Architecture B (attention) with lessons learned, since losing to bignet doesn't
+  necessarily mean attention is a dead end for this problem, just that this particular
+  setup/budget lost this particular comparison. E5/E10/E11 remain valuable but are no longer
+  gating the headline scale-ladder question the way they would have been if bignet2 had plateaued.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
