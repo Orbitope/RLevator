@@ -489,15 +489,38 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   partly a genuine capacity limit, not solely an inductive-bias/architecture problem — reinforcing
   the user's original instinct when this pivot was proposed.
 
-  **Follow-up, in progress:** reward was still improving at the 5M cutoff (not clearly plateaued:
-  -7,700 → -7,300 over the last ~1M steps), so extended the identical run to 10M steps via
-  `scripts/resume_training.sh` + `config/elevator_ppo_e3_m_bignet_10m.yaml` (run continuing as
-  `elev-e3-m-bignet-01`, resumed cleanly from step 5,000,192 — snapshot at
-  `Runs/training/elev-e3-m-bignet-01/resume_20260715T012223Z/`). If bignet-10M closes the remaining
-  ~9% gap to LOOK/ETA or gets close, that's a strong signal to try an even bigger network next
-  (more hidden units and/or layers) as the most promising remaining lever for rung M — and
-  potentially for resuming the E3 ladder (L/Z/H) directly on a bigger flat MLP rather than either
-  of the E6 architectures.
+  **Bignet-10M result — RL nearly closes the gap with LOOK/ETA for the first time in this whole
+  investigation.** Extended the identical run to 10M steps via `scripts/resume_training.sh` +
+  `config/elevator_ppo_e3_m_bignet_10m.yaml` (resumed cleanly from step 5,000,192, snapshot at
+  `Runs/training/elev-e3-m-bignet-01/resume_20260715T012223Z/`). Training reward kept improving but
+  with clearly diminishing returns (-7,290 at 5M → -6,700 at 7M → -6,100 at 8.3M → -5,713 at 10M —
+  each ~1.5M-step stretch bought roughly half the previous stretch's gain, a textbook
+  diminishing-returns curve rather than a hard wall). Eval sweep
+  (`Runs/20260714-231218-E3-sweep-M-bignet-10M-UpPeak/sweep_summary.csv`) confirms the reward gain
+  translated into real dispatch quality:
+
+  | Policy                          | delivered (mean/5 seeds) | vs LOOK/ETA |
+  |----------------------------------|---------------------------|-------------|
+  | LOOK                             | 2119.2                    | baseline    |
+  | ETA                              | 2109.8                    | baseline    |
+  | Flat-MLP 256×2, 5M steps         | 1590.4                    | -25%        |
+  | Flat-MLP 512×3 ("bignet"), 5M steps | 1929.6                 | -9%         |
+  | Flat-MLP 256×2, 10M steps        | 1958.4                    | -8%         |
+  | **Flat-MLP 512×3 ("bignet"), 10M steps** | **2031.8**         | **-4%**     |
+  | Architecture B (attention), 10M steps | 1406.2               | -34%        |
+  | Architecture A (both attempts)  | 0                          | -100% (structurally broken) |
+
+  **This is the closest any RL policy has come to LOOK/ETA at rung M across the entire E3/E6
+  investigation** — within ~4%, versus the original network's ~8% gap at the same 10M-step budget.
+  Confirms decisively that (a) the E6 architectures (multi-agent parameter sharing, BufferSensor
+  attention) were not the right lever for this problem, and (b) the flat MLP's rung-M shortfall was
+  real capacity, closeable with a bigger network and more steps — exactly the user's original
+  hypothesis. Given diminishing returns were already visible by 10M, an even-bigger network is
+  worth trying as the next increment but should be expected to close some, not necessarily all, of
+  the remaining ~4% gap. **Recommended next steps:** (1) try one step bigger (e.g. 768–1024 hidden
+  units and/or 4 layers) on rung M to see if the gap keeps shrinking or has plateaued; (2) if it
+  does keep closing, resume the E3 scale ladder (L, then Z, then H) directly on the winning
+  bigger-flat-MLP recipe rather than either E6 architecture, per the plan's original step 4.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
