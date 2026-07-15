@@ -399,13 +399,42 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     "how much can we beat the current best by" ceiling test), so it's running ahead of Arms 1-3.
     Arms 1 (full-state), 2 (realistic), 3 (realistic+wait-age) — all re-created at the new 1024×5
     size — queued to follow sequentially.
-  - **Arm 4 (Omniscient) result — DONE, surprising: omniscient info did NOT beat the baseline-obs
-    bignet2 result; ceiling test came in below the floor it was meant to measure above.**
-    Training ran cleanly to the 5M-step cap (`results/elev-e5-m-omniscient-01/`), reward plateaued
-    around -6,600 to -7,400 for the last ~700K steps (not climbing) — decisively better *trajectory*
-    than bignet2's baseline-obs run at equivalent step counts (bignet2 was still around -10,500 to
-    -11,700 at 2M steps vs. omniscient's plateau), so no extension to 10M per the cheap-test-first
-    protocol.
+  - **Arm 4 (Omniscient) — 5M INTERIM, INCONCLUSIVE (NOT a ceiling result). CORRECTED
+    2026-07-15: my first write-up here concluded "omniscient info didn't help / came in below the
+    baseline" — that conclusion was WRONG and is retracted.** Two mistakes: (1) I compared
+    omniscient-at-5M against bignet2-at-**10M** (unfair by exactly 5M steps), and (2) I called the
+    5M reward a "plateau" and skipped the extend-to-10M protocol, when it was in fact still
+    descending ~700 reward/M-steps at the cutoff — I mistook the ±400-900 noise in the raw
+    20K-summary rows for convergence.
+    - **The clean diagnostic is training reward, which is OBSERVATION-INDEPENDENT** (computed by
+      `Building.CollectReward` from sim state, not from what the agent sees), so omniscient and
+      bignet2 are directly comparable on reward at matched steps despite different obs/net. Both are
+      the rung-M Training scene, same RewardConfig/traffic. Trajectories are intertwined within
+      noise the entire way down:
+      | Step | bignet2 (768×4, 254-in) | omniscient (1024×5, 885-in) |
+      |------|-------------------------|------------------------------|
+      | 1M   | -15,929 | -15,667 |
+      | 2M   | -11,778 | -13,034 |
+      | 3M   | -9,137  | -9,799  |
+      | 4M   | -7,926  | -7,796  |
+      | 5M   | **-6,932** | **-7,107** |
+      | 10M  | **-5,297** | *(not yet run)* |
+      At 5M the two are **tied** (within the noise band). bignet2's entire margin comes from its
+      5M→10M improvement (-6,932 → -5,297, +1,635 reward) — the exact stretch omniscient never got
+      to run. So the eval deficit (1969 vs bignet2's 2110 delivered) is an **undertraining
+      artifact**, not evidence about the value of the observation.
+    - **Information-theoretically the omniscient obs is a strict superset of full-state**, so at
+      convergence it cannot be worse; a worse-looking result is under-optimization by definition.
+      Three factors make omniscient converge *slower per step* than bignet2, so it needs AT LEAST
+      the full 10M (likely more) before any verdict: (a) **sparse-input dilution** — of the 592
+      added floats, under UpPeak nearly all demand originates at the lobby so the vast majority of
+      destination-histogram slots are ~always zero, diluting the 293 informative features ~3.5×;
+      (b) `normalize:true` running stats over near-constant-zero features add conditioning noise;
+      (c) bigger net (1024×5 vs 768×4) = more params to fit.
+    - **NEXT: resume `elev-e5-m-omniscient-01` 5M→10M and re-eval** (it was still climbing — this is
+      the extend-to-10M protocol I should have followed). Only after the matched-budget comparison
+      (omniscient@10M vs bignet2@10M, and vs the Arm-1 full-state@5M control now training) is the
+      value-of-omniscience question actually answerable.
     - **Eval-harness bug found and fixed first:** `EvalHarness.RunSingle`/`RunScaleLadderSweep`
       built the PPO eval `Building` with a **fresh default `ObservationConfig`**
       (`ScriptableObject.CreateInstance<ObservationConfig>()`), not the asset the model was actually
@@ -422,18 +451,14 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
       — confirms this was purely an eval-harness bug, not a bad model. **Any future E5 sweep menu
       item (Arms 1-3) must pass its matching `obsConfigAssetPath` or it will silently repeat this
       bug.**
-    - **Result (5-seed UpPeak sweep, rung M, `Runs/20260715-143735-...`):** PPO (omniscient, 1024×5,
-      5M steps) delivered mean **1969.0** vs. LOOK **2119.2** vs. ETA **2109.8** — still **~7.1%
-      behind LOOK**, and notably *worse* than the baseline-obs bignet2 result (2110.6 delivered @
-      10M steps, 768×4, matching/beating LOOK+ETA). Per-seed: PPO {1965, 2007, 1965, 1971, 1937}
-      vs. LOOK {2134, 2164, 2122, 2122, 2054} vs. ETA {2107, 2161, 2103, 2122, 2056}.
-    - **Interpretation:** giving the policy exact origin→destination knowledge for every rider did
-      not raise the ceiling above the current best — if anything the much larger/denser observation
-      (885 vs. 254 floats) made the same step budget (5M vs. bignet2's 10M) harder to learn from
-      rather than easier. Confounded by both step count and network size differing from bignet2's
-      winning recipe, so this doesn't rule out omniscience helping with a longer budget — but it's
-      a clear signal that "more/perfect information" isn't a free win here, and the practical
-      takeaway (real controllers can't have this signal anyway) is unaffected either way.
+    - **5M interim eval (5-seed UpPeak sweep, rung M, `Runs/20260715-143735-...`):** PPO
+      (omniscient, 1024×5, 5M steps) delivered mean **1969.0** vs. LOOK **2119.2** vs. ETA
+      **2109.8**. Per-seed: PPO {1965, 2007, 1965, 1971, 1937} vs. LOOK {2134, 2164, 2122, 2122,
+      2054} vs. ETA {2107, 2161, 2103, 2122, 2056}. **This is an undertrained-checkpoint number, not
+      a ceiling** — see the reward-trajectory analysis above: at 5M the omniscient policy is tied
+      with bignet2-at-5M in (observation-independent) reward, and bignet2 gained +1,635 reward
+      over its 5M→10M continuation. The comparison to make is omniscient@10M vs bignet2@10M, which
+      requires resuming this run. Do NOT cite 1969-vs-2110 as a finished result.
 
 ### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP matches LOOK/ETA; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
