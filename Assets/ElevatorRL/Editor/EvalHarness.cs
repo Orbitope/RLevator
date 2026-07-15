@@ -195,6 +195,14 @@ namespace ElevatorRL.Editor
         static void RunE3SweepLBignet2_10M() => RunScaleLadderSweep("L-bignet2-10M", 30, 8, 8,
             "Assets/ElevatorRL/Models/ElevatorController_L_e3_bignet2_10m.onnx", obsSize: 648);
 
+        // EXPERIMENT_PLAN.md E5 Arm 4 (omniscient obs, 1024x5 net), rung M, 5M steps. obsSize=885
+        // matches the baked VectorObservationSize logged when ObservationConfig_Omniscient was
+        // pointed at (293 baseline full-state + 592 omniscientDestinations block = 885).
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Run Sweep (LOOK vs ETA vs PPO, rung M, omniscient, 5M steps, seeds 1-5)")]
+        static void RunE5SweepMOmniscient() => RunScaleLadderSweep("M-e5-omniscient", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e5_omniscient.onnx", obsSize: 885,
+            obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_Omniscient.asset");
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),
@@ -221,7 +229,8 @@ namespace ElevatorRL.Editor
         // obsSize as the per-car observation size; false uses the flat single-agent PpoDispatcher.
         static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
             string modelPath, int obsSize, bool multiAgent = false, bool attention = false,
-            int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0)
+            int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0,
+            string obsConfigAssetPath = null)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
             const TrafficPattern pattern = TrafficPattern.UpPeak;
@@ -233,6 +242,23 @@ namespace ElevatorRL.Editor
                 Debug.LogError($"[Eval] Could not load ModelAsset at {modelPath}.");
                 return;
             }
+
+            // PPO must see the exact ObservationConfig it was trained with -- RunSingle otherwise
+            // defaults to a fresh ObservationConfig (all blocks at their C# field defaults), which
+            // only happens to match the baseline E2/E3 config. Any arm trained with a non-default
+            // ObservationConfig (e.g. E5's obs ablations) needs its asset passed explicitly here or
+            // the policy gets a garbled/misaligned observation vector at eval time.
+            ObservationConfig obsConfigOverride = null;
+            if (obsConfigAssetPath != null)
+            {
+                obsConfigOverride = AssetDatabase.LoadAssetAtPath<ObservationConfig>(obsConfigAssetPath);
+                if (obsConfigOverride == null)
+                {
+                    Debug.LogError($"[Eval] Could not load ObservationConfig at {obsConfigAssetPath}.");
+                    return;
+                }
+            }
+
             var ppoMulti = multiAgent ? new MultiAgentPpoDispatcher(modelAsset, obsSize) : null;
             var ppoAttn = attention ? new AttentionDispatcher(modelAsset, globalObsSize, carEntitySize, maxNumObservables) : null;
             var ppoFlat = (multiAgent || attention) ? null : new PpoDispatcher(modelAsset, obsSize);
@@ -250,7 +276,8 @@ namespace ElevatorRL.Editor
                 var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, rungName,
                     floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
                 var (ppoEp, _) = RunSingle("PPO", ppoDispatch, rungName,
-                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true,
+                    obsConfigOverride: obsConfigOverride);
 
                 foreach (var (name, e) in new[] { ("LOOK", look), ("ETA", eta), ("PPO", ppoEp) })
                     rows.Add($"{name},{seed},{e.delivered},{e.waitMean:0.00},{e.waitP95:0.00},{e.waitMax:0.00}," +
@@ -605,14 +632,15 @@ namespace ElevatorRL.Editor
         public static (EpisodeStats episode, string runDir) RunSingle(string policy, Dispatcher dispatch,
             string preset, int floors, int cars, int capacity,
             TrafficPattern pattern, float intensity, int seed,
-            float totalSeconds, float warmupSeconds, float bucketSeconds, bool quiet = false)
+            float totalSeconds, float warmupSeconds, float bucketSeconds, bool quiet = false,
+            ObservationConfig obsConfigOverride = null)
         {
             var cfg = ScriptableObject.CreateInstance<BuildingConfig>();
             cfg.numFloors = floors; cfg.numElevators = cars; cfg.capacity = capacity;
             cfg.randomizeActive = false; cfg.minActiveElevators = 1; cfg.serviceChangeProbability = 0f;
 
             var reward  = ScriptableObject.CreateInstance<RewardConfig>();
-            var obs     = ScriptableObject.CreateInstance<ObservationConfig>();
+            var obs     = obsConfigOverride != null ? obsConfigOverride : ScriptableObject.CreateInstance<ObservationConfig>();
             var traffic = ScriptableObject.CreateInstance<TrafficConfig>();
             traffic.useDayCycle = false; traffic.defaultPattern = pattern; traffic.intensity = intensity;
 

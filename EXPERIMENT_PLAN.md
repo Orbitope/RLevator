@@ -399,6 +399,41 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     "how much can we beat the current best by" ceiling test), so it's running ahead of Arms 1-3.
     Arms 1 (full-state), 2 (realistic), 3 (realistic+wait-age) — all re-created at the new 1024×5
     size — queued to follow sequentially.
+  - **Arm 4 (Omniscient) result — DONE, surprising: omniscient info did NOT beat the baseline-obs
+    bignet2 result; ceiling test came in below the floor it was meant to measure above.**
+    Training ran cleanly to the 5M-step cap (`results/elev-e5-m-omniscient-01/`), reward plateaued
+    around -6,600 to -7,400 for the last ~700K steps (not climbing) — decisively better *trajectory*
+    than bignet2's baseline-obs run at equivalent step counts (bignet2 was still around -10,500 to
+    -11,700 at 2M steps vs. omniscient's plateau), so no extension to 10M per the cheap-test-first
+    protocol.
+    - **Eval-harness bug found and fixed first:** `EvalHarness.RunSingle`/`RunScaleLadderSweep`
+      built the PPO eval `Building` with a **fresh default `ObservationConfig`**
+      (`ScriptableObject.CreateInstance<ObservationConfig>()`), not the asset the model was actually
+      trained with. This happened to be harmless for all prior E2/E3/E6 sweeps because the default
+      field values exactly equal the baseline config those arms used — but it silently broke every
+      E5 arm, since none of them use the default flags. First eval attempt on the omniscient model
+      showed PPO badly losing to LOOK/ETA (delivered ~633–1209 vs. LOOK's ~2100+) purely because the
+      885-float input the model expects was being filled from a config with `queueLengths`,
+      `timeOfDay`, `pattern`, and `omniscientDestinations` all false — a garbled/misaligned input,
+      not a real performance signal. **Fix:** added `obsConfigAssetPath` to `RunScaleLadderSweep` /
+      `obsConfigOverride` to `RunSingle` (`EvalHarness.cs`) so PPO's eval `Building` is built with
+      the same `ObservationConfig` asset used in training; wired the omniscient sweep menu item to
+      `ObservationConfig_Omniscient.asset`. Re-ran and PPO delivered jumped from ~900 to ~1965-2007
+      — confirms this was purely an eval-harness bug, not a bad model. **Any future E5 sweep menu
+      item (Arms 1-3) must pass its matching `obsConfigAssetPath` or it will silently repeat this
+      bug.**
+    - **Result (5-seed UpPeak sweep, rung M, `Runs/20260715-143735-...`):** PPO (omniscient, 1024×5,
+      5M steps) delivered mean **1969.0** vs. LOOK **2119.2** vs. ETA **2109.8** — still **~7.1%
+      behind LOOK**, and notably *worse* than the baseline-obs bignet2 result (2110.6 delivered @
+      10M steps, 768×4, matching/beating LOOK+ETA). Per-seed: PPO {1965, 2007, 1965, 1971, 1937}
+      vs. LOOK {2134, 2164, 2122, 2122, 2054} vs. ETA {2107, 2161, 2103, 2122, 2056}.
+    - **Interpretation:** giving the policy exact origin→destination knowledge for every rider did
+      not raise the ceiling above the current best — if anything the much larger/denser observation
+      (885 vs. 254 floats) made the same step budget (5M vs. bignet2's 10M) harder to learn from
+      rather than easier. Confounded by both step count and network size differing from bignet2's
+      winning recipe, so this doesn't rule out omniscience helping with a longer budget — but it's
+      a clear signal that "more/perfect information" isn't a free win here, and the practical
+      takeaway (real controllers can't have this signal anyway) is unaffected either way.
 
 ### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP matches LOOK/ETA; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
