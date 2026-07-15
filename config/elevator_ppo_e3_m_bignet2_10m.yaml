@@ -1,0 +1,37 @@
+# config/elevator_ppo_e3_m_bignet2_10m.yaml — extends elev-e3-m-bignet2-01 from 5M to 10M steps
+#   mlagents-learn config/elevator_ppo_e3_m_bignet2_10m.yaml --run-id=elev-e3-m-bignet2-01 --resume
+#
+# Bignet2 (768 hidden units x 4 layers) was still clearly climbing at its 5M-step cutoff
+# (reward -7,900 -> -6,932 over the last ~1M steps, a bigger gain than bignet-1's own 5M-cutoff
+# improvement) and had already caught up to and passed bignet-1's 5M result (-6,932 vs -7,290)
+# despite trailing through the middle of training -- same cheap-test-first extension logic as
+# every prior 5M->10M step in this project.
+#
+# NOTE: ML-Agents' linear learning_rate/beta/epsilon schedules recompute from
+# current_step/max_steps on resume -- bumping max_steps here means those jump back up from their
+# fully-decayed 5M-step values rather than continuing to decay smoothly. Expected and generally
+# benign; flagging so a mid-run LR discontinuity in TensorBoard isn't mistaken for a bug.
+behaviors:
+  ElevatorController:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 768
+      num_layers: 4
+      normalize: true
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 10.0e6
+    time_horizon: 256
+    summary_freq: 20000

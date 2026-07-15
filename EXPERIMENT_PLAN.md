@@ -532,15 +532,13 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   does keep closing, resume the E3 scale ladder (L, then Z, then H) directly on the winning
   bigger-flat-MLP recipe rather than either E6 architecture, per the plan's original step 4.
 
-- **NEXT (queued, not yet started): E6-bignet2 — one size bigger.** New config
-  `config/elevator_ppo_e3_m_bignet2.yaml` (proposed: 768 or 1024 hidden units, 3-4 layers),
-  same build/scene/protocol as `elev-e3-m-bignet-01`, rung M, 5M steps first (cheap-test-first,
-  same reasoning as every prior step-budget decision in this doc) — extend to 10M only if still
-  climbing at the 5M cutoff. Eval via a new `RunE3SweepMBignet2`-style menu item mirroring the
-  existing bignet ones. Decision point: if delivered count keeps closing the gap toward LOOK/ETA,
-  resume the E3 ladder (L/Z/H) on this recipe next; if it plateaus at/near bignet-10M's ~2032, that
-  says model size has topped out for rung M and the more promising levers become reward/observation
-  shaping rather than more parameters.
+- **E6-bignet2 5M-step result (`elev-e3-m-bignet2-01`, 768 hidden units × 4 layers) — still
+  climbing, extended to 10M.** Trailed bignet-1 (512×3) through the middle of training (e.g. step
+  3.44M: -8,896 vs bignet-1's -7,976 at the same step — larger network needing more samples to get
+  going, as expected), but caught up and passed it by the 5M cutoff: **-6,932 vs bignet-1's -7,290
+  at 5M.** Still clearly improving in the last ~1M steps (-7,900 → -6,932, a bigger gain than
+  bignet-1 showed at its own 5M mark), so extended to 10M via `scripts/resume_training.sh` +
+  `config/elevator_ppo_e3_m_bignet2_10m.yaml` (resumed cleanly from step 5,000,192).
 
 - **Agreed follow-on sequence (2026-07-14):** (1) **E6-bignet2** above; (2) **E5** — observation
   ablations (cheap, config-only); (3) **E10** — reward shaping ablations (wait-min, in-car-time-min,
