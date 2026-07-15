@@ -876,6 +876,20 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Note:** this reframes E3's "scale ladder" headline — the honest thesis figure is now RL−LOOK gap
   over *both* axes (building size AND traffic pattern), not size alone. E10 (avg-vs-tail-wait reward)
   becomes more meaningful after E12 and should follow it.
+- **Decisions (2026-07-15):** recipe = **bignet2 (768×4, baseline obs)** so traffic pattern is the
+  only variable vs. the UpPeak headline — meaning **UpPeak specialists = reuse existing bignet2**
+  (M: `ElevatorController_M_e3_bignet2_10m.onnx`; L: `..._L_e3_bignet2_10m.onnx`), no retrain. The
+  traffic pattern is injected at runtime via env params (see infra commit `fdf276e`), so **one
+  headless build per size serves all patterns**. Interfloor = **Midday (enum 3)** (uniform arrivals,
+  all-to-all destinations). Sizes M and L; both specialists AND a day-cycle generalist per size.
+- **EXECUTION QUEUE / STATUS (update after each step; autonomous loop resumes from here):**
+  - Infra: runtime override + eval param + 4 YAMLs (`config/elevator_ppo_e12_{downpeak,lunch,interfloor,daycycle}.yaml`) — DONE, committed `fdf276e`. Override verified in headless: `[E12] traffic override active: pattern=Midday` (env param traffic_pattern=3 → Midday), and interfloor reward scale (~-41k@40k) differs from UpPeak (~-26k@40k), confirming the pattern really changed.
+  - M build (baseline obs, VectorObservationSize=254, 5 branches) — DONE (`Builds/HeadlessTrainer/RLevatorTrainer.app`, 15:14 mtime).
+  - **[RUNNING] `elev-e12-m-interfloor-01`** (config interfloor, preset M) — the money test.
+  - [QUEUED, M, in order] lunch → downpeak → daycycle. Each: 5M first (extend to 10M if still climbing), then eval on its OWN pattern vs LOOK/ETA, document here, commit.
+  - [THEN] point agent at L preset (rebake to VectorObservationSize=648, 8 branches) → build L → run interfloor/lunch/downpeak/daycycle at L.
+  - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8).
+  - Headline to fill in: RL−LOOK delivered gap per pattern × size (expect ~0 on UpPeak/DownPeak, positive on Lunch/Interfloor).
 
 ---
 
