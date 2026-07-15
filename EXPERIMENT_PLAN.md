@@ -262,7 +262,7 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   mechanism §0 describes. Single-run caveat: one training seed so far (`elev-e2-s-ppo-01`); the
   5-seed sweep above is on the *eval* side only, not repeated training runs.
 
-### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — PAUSED after S, M (see E6)
+### E3 — **The headline: RL vs. LOOK as scale/constraint increases** — PAUSED after S, M; resume on E6's winning bigger-flat-MLP recipe (see E6)
 - **Q:** Does the RL−LOOK performance gap grow along S→M→L→Z→H?
 - **Arms:** LOOK, (ETA), PPO-best-architecture, per rung.
 - **Metric:** relative improvement in avg wait / p95 wait / abandonment vs. LOOK, plotted **as a
@@ -315,10 +315,20 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   "realistic"} vs {+ wait-age}. Cheap: config-only, no code.
 - **Metric:** convergence performance per obs set; expect wait-age to matter most on Z/H.
 
-### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **PULLED FORWARD, active now**
+### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP wins; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
 - **Arms:** flat MLP (baseline), shared per-car encoder, attention.
 - **Metric:** performance & sample-efficiency on L and H; this is where scalability is won or lost.
+- **TL;DR (full detail below):** Architecture A (multi-agent parameter sharing) never learned —
+  first attempt used the wrong trainer for cooperative multi-agent (fixed), second attempt revealed
+  a structural flaw instead (per-car agents can't see other cars' state at all, so coordination is
+  impossible regardless of trainer) — rejected, not fixable without eroding the design's point.
+  Architecture B (BufferSensor attention) trained fine but lost to the flat-MLP baseline at every
+  step budget tried. The winning move was the cheap one: just give the *original* flat MLP more
+  capacity (512×3 vs 256×2). At 10M steps it delivers 2031.8/5000 vs LOOK/ETA's ~2115 (**-4%**,
+  the closest any RL policy has come across this whole investigation) vs the original network's
+  -8% at the same budget. See the full comparison table and next-step recommendation near the end
+  of this section.
 - **2026-07-13 — paused E3's S→H ladder here.** M's flat-MLP result (5M steps: PPO badly behind
   LOOK/ETA; 10M steps: closed most but not all of the gap) shows the single-agent/flat-observation
   architecture is running out of information/capacity to coordinate 5 cars, and L (8 cars) would
