@@ -298,8 +298,20 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   `Runs/20260713-125134-E3-sweep-M-UpPeak/` (5M) and `Runs/20260713-142044-E3-sweep-M-10M-UpPeak/`
   (10M). Open question for the next step: extend further (e.g. 15-20M) to see if it fully closes,
   or treat the remaining gap as evidence the flat-MLP architecture needs help (E6: shared per-car
-  encoder / attention) even once given enough time. Decision pending — not yet resolved before
-  training L.
+  encoder / attention) even once given enough time. **Resolved by E6**: neither new architecture
+  helped, but a bigger flat MLP (768×4, "bignet2") closed the gap almost entirely at 10M
+  (2110.6/5000 vs LOOK's 2119.2) — see E6 for the full writeup.
+
+- **Rung L, resumed on bignet2's recipe (`elev-e3-l-bignet2-01`) — launched 2026-07-15.** L is 8
+  cars / 30 floors (vs M's 5 cars / 16 floors) — a genuinely bigger coordination problem, so the
+  same open question applies again: does the capacity that closed the gap at M also scale to L, or
+  does L need more? Config `config/elevator_ppo_e3_l_bignet2.yaml` (same 768×4 network as
+  bignet2), scene re-pointed at `L_BuildingConfig` via `Point Agent At L Preset` + rebuilt headless
+  trainer (caught and fixed a stale-scene bug here: the Editor had `TrainingAttention.unity` open
+  from earlier E6-B work, so the preset-pointing menu item silently failed against the wrong
+  scene's GameObject hierarchy until `Training.unity` was explicitly loaded first — a reminder to
+  always verify `get_scene_info` before scene-mutating menu calls, not just check the on-disk
+  `.unity` file). 5M steps first, same cheap-test-first protocol as every prior rung/size decision.
 
 ### E4 — Zoning / floor-restriction stress *(the core of the thesis)*
 - **Q:** With per-car banks (rung **Z**), does RL exploit the structure better than range-aware
