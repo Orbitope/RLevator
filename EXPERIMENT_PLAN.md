@@ -336,6 +336,35 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   and/or an even bigger network once this run's trend is visible — a materially different
   (harder) story than rung M's clean resolution.
 
+- **Rung L 10M-step result — meaningful progress, but the gap is far from closed.** Finished
+  cleanly at step 10,000,000, reward -27,638 (up from -32,984 at 5M — real improvement, but the
+  curve was clearly diminishing: -32,140 at 4.64M → -32,984 at 5.0M → -27,638 at 10.0M, i.e. all
+  of the 5M-cutoff's apparent flatness turned out to be temporary, but the second 5M-step half
+  only bought about as much improvement as expected from a slowing curve, not an accelerating
+  one). Eval sweep
+  (`Runs/20260715-072031-E3-sweep-L-bignet2-10M-UpPeak/sweep_summary.csv`, 5 seeds, UpPeak):
+
+  | Policy | delivered (mean/5 seeds) | vs LOOK/ETA |
+  |---|---|---|
+  | LOOK | 2683.0 | baseline |
+  | ETA | 2699.2 | baseline |
+  | PPO (bignet2, 5M) | 893.2 | -67% |
+  | **PPO (bignet2, 10M)** | **1397.2** | **-48%** |
+
+  Doubling the step budget closed roughly 28% of the remaining gap (67%→48%), a real but far
+  slower rate of convergence than M showed (M's 256×2→768×4 capacity jump at a *fixed* 10M-step
+  budget closed its ~25% gap almost entirely). **This confirms the two rungs are qualitatively
+  different problems, not just a bigger instance of the same one** — L is not simply "M but
+  slower to converge on the same recipe"; even 15M cumulative steps on the biggest network tried
+  leaves L at roughly half of LOOK/ETA's throughput. Decision point reached: continuing to
+  iteratively extend steps on bignet2 is the cheapest next lever (consistent with the pattern so
+  far — every extension has bought real, if diminishing, improvement) but is unlikely to close a
+  gap this size alone; a bigger network specifically sized for L's larger fleet (8 cars, more
+  than M's 5) is the more principled next test once/if further step extensions plateau. **Pausing
+  the L investigation here to report this finding rather than committing to another 10M-step run
+  or architecture change without a decision on how much further budget to invest** — this is a
+  natural checkpoint given how much the L result diverges from M's clean resolution.
+
 ### E4 — Zoning / floor-restriction stress *(the core of the thesis)*
 - **Q:** With per-car banks (rung **Z**), does RL exploit the structure better than range-aware
   LOOK — e.g. by pre-positioning restricted cars and covering overlap zones?
