@@ -532,6 +532,16 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   does keep closing, resume the E3 scale ladder (L, then Z, then H) directly on the winning
   bigger-flat-MLP recipe rather than either E6 architecture, per the plan's original step 4.
 
+- **NEXT (queued, not yet started): E6-bignet2 — one size bigger.** New config
+  `config/elevator_ppo_e3_m_bignet2.yaml` (proposed: 768 or 1024 hidden units, 3-4 layers),
+  same build/scene/protocol as `elev-e3-m-bignet-01`, rung M, 5M steps first (cheap-test-first,
+  same reasoning as every prior step-budget decision in this doc) — extend to 10M only if still
+  climbing at the 5M cutoff. Eval via a new `RunE3SweepMBignet2`-style menu item mirroring the
+  existing bignet ones. Decision point: if delivered count keeps closing the gap toward LOOK/ETA,
+  resume the E3 ladder (L/Z/H) on this recipe next; if it plateaus at/near bignet-10M's ~2032, that
+  says model size has topped out for rung M and the more promising levers become E5 (observation
+  ablations) and/or reward shaping (E8's fairness-reward idea) rather than more parameters.
+
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
   sizes vs. fixed-fleet specialists?
