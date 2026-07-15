@@ -539,8 +539,15 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   climbing at the 5M cutoff. Eval via a new `RunE3SweepMBignet2`-style menu item mirroring the
   existing bignet ones. Decision point: if delivered count keeps closing the gap toward LOOK/ETA,
   resume the E3 ladder (L/Z/H) on this recipe next; if it plateaus at/near bignet-10M's ~2032, that
-  says model size has topped out for rung M and the more promising levers become E5 (observation
-  ablations) and/or reward shaping (E8's fairness-reward idea) rather than more parameters.
+  says model size has topped out for rung M and the more promising levers become reward/observation
+  shaping rather than more parameters.
+
+- **Agreed follow-on sequence (2026-07-14):** (1) **E6-bignet2** above; (2) **E5** — observation
+  ablations (cheap, config-only); (3) **E10** — reward shaping ablations (wait-min, in-car-time-min,
+  average-vs-longest-wait via a quadratic wait penalty, throughput-only control, abandonment-averse
+  — see E10 below for the full arm list); (4) **E11** — revisit Architecture B (attention) with
+  lessons learned, since losing to bignet doesn't necessarily mean attention is a dead end for this
+  problem, just that this particular setup/budget lost this particular comparison.
 
 ### E7 — Fleet-size generalization
 - **Q:** Does one policy trained with randomized/curriculum fleet size generalize across fleet
@@ -551,8 +558,7 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Metric:** performance vs. specialists across the fleet-size axis; graceful degradation.
 
 ### E8 — Stretch
-- **Fairness reward:** penalize squared wait (or add explicit max-wait term); measure tail-wait
-  reduction vs. throughput cost.
+- ~~Fairness reward~~ — promoted to its own section, see E10.
 - **Pattern transfer:** train on one pattern, test on another (up→down); measure generalization.
 - **BC/GAIL warm-start** from LOOK demonstrations to accelerate E3/E4.
 
@@ -570,6 +576,68 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Metric:** sample efficiency (steps/wall-clock to match LOOK) and asymptotic performance, per
   rung; secondary — does A-TargetFloor's loss of mid-trip redirect flexibility cost anything on
   Z/H (zoned/heterogeneous), where anticipatory re-routing might matter more?
+
+### E10 — Reward shaping ablations *(queued: after E6-bignet2, alongside/before E5)*
+- **Q:** Does *what* the reward optimizes for (not just how much capacity the policy has) change
+  which policy emerges — specifically average-wait vs. tail/longest-wait, and hallway-time vs.
+  in-car-time?
+- **Current baseline weights** (`RewardConfig.cs`): `delivered=+10`, `movedToward=+0.4`,
+  `movedAway=-0.4`, `rejected=-5`, `abandoned=-8`, `inElevator=-0.04`/rider-second,
+  `inQueue=-0.12`/passenger-second. `inQueue`/`inElevator` are both **linear** in time — a
+  policy that makes 10 people wait 10s each scores identically to one that makes 1 person wait
+  100s, i.e. the current reward is already an *average*-wait-style objective; it does not
+  distinguish average from tail/longest wait at all.
+- **Arms (each a new `RewardConfig` asset + training config, same architecture/protocol as
+  whatever's currently winning — bignet-10M as of 2026-07-14 — so reward is the only variable)**:
+  1. **Wait-minimizing** — up-weight `inQueue` substantially (e.g. ×3-5), zero or shrink
+     `inElevator`. Framing: "get people out of the hallway; a slower ride once boarded is fine."
+  2. **In-car-time-minimizing** — the inverse: up-weight `inElevator`, shrink `inQueue`. Framing:
+     "once picked up, get them there fast; longer hallway waits are acceptable."
+  3. **Average vs. longest wait (fairness)** — replace/augment the linear `inQueue` term with a
+     **quadratic** wait penalty: accumulate `sum_i(waitTime_i) * dt` per passenger per tick
+     (approximating d/dt(waitTime²)) instead of the current flat `waiting_count * dt`
+     (`Building.AgeOccupants`/`AgeQueue`, `Assets/ElevatorRL/Runtime/Building.cs:247-274`) — this
+     makes the marginal cost of waiting grow with how long someone's already waited, directly
+     penalizing a long tail even if it lowers average wait less. Needs: a new `Acc` field (e.g.
+     `queueSecondsWeighted`), the accumulation change in `AgeQueue`, a new `RewardConfig` weight,
+     and wiring into `CollectReward()`. Compare mean wait vs. `waitP95`/`waitMax` (already tracked
+     in `StatsCollector`/eval CSVs) against the linear baseline — the quadratic arm should trade
+     some average-wait for a lower p95/max.
+  4. **Throughput-only (control)** — zero `inQueue` and `inElevator` entirely; reward purely on
+     `delivered`/`movedToward`/`movedAway`/`rejected`/`abandoned`. Tests how much the continuous
+     occupancy penalties (vs. sparse event reward alone) actually matter for shaping useful
+     mid-episode behavior — a cheap ablation, not expected to win, but informative.
+  5. **Abandonment-averse** — up-weight `abandoned` further and/or add an early-warning term for
+     riders approaching `maxWait` (before they actually abandon), testing whether anticipatory
+     shaping beats reacting only after the fact.
+- **Metric:** delivered count (throughput) + `waitMean` vs. `waitP95`/`waitMax` (average vs. tail)
+  per arm, same 5-seed UpPeak sweep protocol as E6. Expect a real throughput/fairness trade-off in
+  arm 3, not a free lunch.
+
+### E11 — Improved attention architecture *(queued: after E10, revisiting E6 Architecture B)*
+- **Q:** Architecture B (BufferSensor attention) trained without errors but lost to the flat MLP at
+  every step budget tried (E6: -34% vs LOOK/ETA at 10M, vs bignet's -4%) — is that a fundamental
+  ceiling for attention on this task, or did the *specific* attention setup just need more
+  tuning/capacity of its own?
+- **Candidate changes to try** (cheap to expensive):
+  1. **Bigger attention network_settings** — same capacity bump that worked for the flat MLP
+     (hidden_units/num_layers) applied to `elevator_ppo_e6b_m.yaml`'s trunk — attention's per-car
+     entity encoder + residual self-attention block sizes are also configurable; untested whether
+     they were undersized rather than the mechanism being wrong.
+  2. **Longer training relative to its slower per-step cost** — attention trains ~2x slower per
+     step than the flat MLP; E6-B's 10M-step budget may still be the *equivalent* of the flat
+     MLP's ~5M in wall-clock/gradient-update terms. Worth an extended run once bignet2/E10 establish
+     what budget actually saturates performance for this task.
+  3. **Positional/identity encoding per car entity** — current per-car entities are permutation-
+     invariant by design (`Building.WriteCarEntity`), which may be *discarding* useful information
+     (e.g., car index is stable across an episode and correlates with zone assignment in Z-rung
+     configs) — worth testing whether adding a car-index feature to each entity helps without
+     reintroducing full order-dependence.
+  4. **Combine with E10's reward findings** — if reward shaping alone materially changes learned
+     behavior, re-run the best attention config against the best reward config before concluding
+     architecture was the limiting factor rather than reward signal.
+- **Metric:** same 5-seed UpPeak sweep protocol; compare against whatever the current best flat-MLP
+  recipe is at the time (bignet2 or later), not just the original E6-B result.
 
 ---
 
