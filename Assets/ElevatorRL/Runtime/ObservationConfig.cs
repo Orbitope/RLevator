@@ -33,5 +33,13 @@ namespace ElevatorRL
         public bool queueLengths = false; // 2F  (normalized by maxQueue)
         public bool timeOfDay = false;    // 2   (sin, cos of day phase)
         public bool pattern = false;      // 5   (one-hot traffic regime)
+
+        [Tooltip("EXACT destination histogram for every waiting AND in-car rider -- not a real " +
+            "controller signal (no real elevator system knows destinations before boarding), " +
+            "purely a ceiling/ablation to measure how much performance is left on the table if the " +
+            "policy could see who's going where, not just that/how-many are waiting. " +
+            "2 x F x F (hall up/down, per origin floor, per destination floor) + E x F (per car, " +
+            "per destination floor).")]
+        public bool omniscientDestinations = false;
     }
 }

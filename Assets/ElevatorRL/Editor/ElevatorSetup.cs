@@ -88,6 +88,9 @@ namespace ElevatorRL.Editor
         [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Realistic+WaitAge Obs Config")]
         static void PointAgentAtObsRealisticPlusWaitAge() => PointAgentAtObsConfig("ObservationConfig_RealisticPlusWaitAge");
 
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Omniscient Obs Config")]
+        static void PointAgentAtObsOmniscient() => PointAgentAtObsConfig("ObservationConfig_Omniscient");
+
         static void PointAgentAtObsConfig(string assetName)
         {
             var go = GameObject.Find("ElevatorController");

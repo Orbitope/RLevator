@@ -1,10 +1,11 @@
 # config/elevator_ppo_e5_m_fullstate.yaml — E5 obs ablation Arm 1: full state, rung M
 #   mlagents-learn config/elevator_ppo_e5_m_fullstate.yaml --run-id=<name>
 #
-# Same network/hyperparameters as bignet2 (768x4, the recipe that matched LOOK/ETA at rung M) --
-# only the observation changes (ObservationConfig_FullState: everything on, including
-# queueLengths/timeOfDay/pattern which no prior run in this project has used). Isolates "does more
-# observation info help" as the only variable per EXPERIMENT_PLAN.md E5.
+# Bumped network size beyond bignet2 (768x4) per user request, applied to all E5 arms regardless
+# of obs config: 1024 hidden units x 5 layers ("bignet3" size). Isolates "does more observation
+# info help" per EXPERIMENT_PLAN.md E5, using a network at least as capable as the current best
+# (bignet2, which matched LOOK/ETA at rung M with the baseline obs) so any obs-driven gain/loss
+# isn't confounded by insufficient capacity.
 behaviors:
   ElevatorController:
     trainer_type: ppo
@@ -18,8 +19,8 @@ behaviors:
       num_epoch: 3
       learning_rate_schedule: linear
     network_settings:
-      hidden_units: 768
-      num_layers: 4
+      hidden_units: 1024
+      num_layers: 5
       normalize: true
     reward_signals:
       extrinsic:

@@ -381,6 +381,7 @@ namespace ElevatorRL
             if (obs.queueLengths) s += 2 * F;
             if (obs.timeOfDay) s += 2;
             if (obs.pattern) s += 5;
+            if (obs.omniscientDestinations) s += 2 * F * F + E * F;
             return s;
         }
 
@@ -452,6 +453,33 @@ namespace ElevatorRL
 
             if (obs.pattern)
                 sensor.AddOneHotObservation((int)ActivePattern, 5);
+
+            // Ceiling/ablation only (EXPERIMENT_PLAN.md E5): exact destination histogram for every
+            // waiting and in-car rider. No real controller has this before boarding -- it exists
+            // purely to measure how much headroom is left if destinations were fully known.
+            if (obs.omniscientDestinations)
+            {
+                for (int f = 0; f < F; f++)
+                {
+                    WriteDestHistogram(sensor, upQ[f], F, cfg.maxQueue);
+                    WriteDestHistogram(sensor, downQ[f], F, cfg.maxQueue);
+                }
+                for (int i = 0; i < E; i++)
+                    WriteDestHistogram(sensor, cars[i].inService ? cars[i].riders : null, F, cfg.capacity);
+            }
+        }
+
+        static readonly float[] _destHistBuf = new float[64]; // reused scratch buffer, F never exceeds this
+        static void WriteDestHistogram(VectorSensor sensor, System.Collections.Generic.List<Passenger> riders, int F, float norm)
+        {
+            System.Array.Clear(_destHistBuf, 0, F);
+            if (riders != null)
+                for (int i = 0; i < riders.Count; i++)
+                {
+                    int d = riders[i].dest;
+                    if (d >= 0 && d < F) _destHistBuf[d] += 1f;
+                }
+            for (int d = 0; d < F; d++) sensor.AddObservation(Mathf.Min(1f, _destHistBuf[d] / norm));
         }
 
         // ---------------------------------------------------------------- per-car observation (E6)

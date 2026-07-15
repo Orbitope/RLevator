@@ -378,16 +378,27 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Arms:** toggle `ObservationConfig` blocks — {full state} vs {buttons+queue-len only,
   "realistic"} vs {+ wait-age}. Cheap: config-only, no code.
 - **Metric:** convergence performance per obs set; expect wait-age to matter most on Z/H.
-- **In progress (2026-07-15):** three `ObservationConfig` assets created
-  (`ObservationConfig_FullState`/`_Realistic`/`_RealisticPlusWaitAge`) with menu items
-  (`Tools/Elevator RL/E5 Obs Ablations/...`) to swap the agent's obs config and rebake
-  `VectorObservationSize`. All three arms use bignet2's exact network (768×4) on rung M — obs is
-  the only variable, per the plan's note that scaling capacity for a ~15% wider input isn't
-  warranted (full-state only adds 39 floats to M's 254-float baseline; the first-layer weight
-  matrix scales with input width automatically regardless of hidden_units/num_layers).
-  **Arm 1 (full-state) launched** as `elev-e5-m-fullstate-01`
-  (`config/elevator_ppo_e5_m_fullstate.yaml`), 5M steps. Arms 2 (realistic) and 3
-  (realistic+wait-age) queued to follow sequentially.
+- **Updated 2026-07-15 (per user request): added a 4th arm — Omniscient — and bumped network size
+  for all E5 arms.** Four `ObservationConfig` assets now exist
+  (`ObservationConfig_FullState`/`_Realistic`/`_RealisticPlusWaitAge`/`_Omniscient`) with menu
+  items (`Tools/Elevator RL/E5 Obs Ablations/...`) to swap the agent's obs config and rebake
+  `VectorObservationSize`.
+  - **New: `omniscientDestinations` observation block** (`ObservationConfig.cs`,
+    `Building.cs:ObservationSize`/`WriteObservation`/`WriteDestHistogram`) — an EXACT destination
+    histogram for every waiting and in-car rider (2×F×F for hall queues per origin floor/direction,
+    + E×F for car riders), not just presence (`hallButtons`) or count (`queueLengths`). No real
+    controller has this before boarding; it exists purely to measure the ceiling — how much is
+    left on the table if the policy could see exactly who's going where. On rung M this adds 592
+    floats to the 293-float full-state baseline (885 total), confirmed via the baked
+    `VectorObservationSize` log matching the hand-computed value exactly.
+  - **Network size bumped to 1024 hidden units × 5 layers ("bignet3") for ALL four E5 arms**,
+    applied regardless of which obs config — per the user's explicit request, not gated on the
+    obs-ablation question itself.
+  - **Arm 4 (Omniscient) launched first** as `elev-e5-m-omniscient-01`
+    (`config/elevator_ppo_e5_m_omniscient.yaml`), 5M steps — this is the highest-value arm (the
+    "how much can we beat the current best by" ceiling test), so it's running ahead of Arms 1-3.
+    Arms 1 (full-state), 2 (realistic), 3 (realistic+wait-age) — all re-created at the new 1024×5
+    size — queued to follow sequentially.
 
 ### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP matches LOOK/ETA; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
