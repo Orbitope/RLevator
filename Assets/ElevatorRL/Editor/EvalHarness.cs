@@ -182,6 +182,13 @@ namespace ElevatorRL.Editor
         static void RunE3SweepMBignet2_10M() => RunScaleLadderSweep("M-bignet2-10M", 16, 5, 8,
             "Assets/ElevatorRL/Models/ElevatorController_M_e3_bignet2_10m.onnx", obsSize: 254);
 
+        // EXPERIMENT_PLAN.md E3 rung L, resumed on E6's winning bignet2 (768x4) recipe. L =
+        // 8 cars/30 floors (VectorObservationSize=648, see ElevatorSetup's baked-BrainParameters
+        // log when Point Agent At L Preset was run).
+        [MenuItem("Tools/Elevator RL/Run E3 Sweep (LOOK vs ETA vs PPO, rung L, bignet2, 5M steps, seeds 1-5)")]
+        static void RunE3SweepLBignet2_5M() => RunScaleLadderSweep("L-bignet2-5M", 30, 8, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_L_e3_bignet2_5m.onnx", obsSize: 648);
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),

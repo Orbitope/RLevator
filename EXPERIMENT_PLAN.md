@@ -313,6 +313,29 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   always verify `get_scene_info` before scene-mutating menu calls, not just check the on-disk
   `.unity` file). 5M steps first, same cheap-test-first protocol as every prior rung/size decision.
 
+- **Rung L 5M-step result — severe gap, much worse than anything seen at M.** Finished cleanly at
+  step 5,000,448, reward -32,984 (roughly flat over the last ~1M steps: -32,140 at 4.64M →
+  -32,984 at 5.0M, within noise — a much shallower improvement curve than the sharp early drop
+  from -40,000 at 1.18M). Eval sweep
+  (`Runs/20260715-050128-E3-sweep-L-bignet2-5M-UpPeak/sweep_summary.csv`, 5 seeds, UpPeak):
+
+  | Policy | delivered (mean/5 seeds) | abandoned (mean) | vs LOOK/ETA |
+  |---|---|---|---|
+  | LOOK | 2683.0 | 1062.6 | baseline |
+  | ETA | 2699.2 | ~1050 | baseline |
+  | **PPO (bignet2, 5M)** | **893.2** | **2422.0** | **-67%** |
+
+  This is a dramatically worse shortfall than anything at rung M (worst M result was -34%, for
+  the failed attention architecture) — bignet2's 768×4 network at 5M steps is nowhere near
+  solving L; abandonment is more than double LOOK/ETA's. L is a genuinely bigger coordination
+  problem (8 cars/30 floors vs M's 5 cars/16 floors) and reward was still (slowly) improving at
+  the cutoff, so extended to 10M via `config/elevator_ppo_e3_l_bignet2_10m.yaml` (same
+  cheap-test-first protocol), **but expectations are set explicitly lower than M's result**: M's
+  ~25% gap closed with one 4x-capacity jump at 10M steps; L's ~67% gap is unlikely to close with
+  a single step-budget doubling on the same network size and may need iterative extensions
+  and/or an even bigger network once this run's trend is visible — a materially different
+  (harder) story than rung M's clean resolution.
+
 ### E4 — Zoning / floor-restriction stress *(the core of the thesis)*
 - **Q:** With per-car banks (rung **Z**), does RL exploit the structure better than range-aware
   LOOK — e.g. by pre-positioning restricted cars and covering overlap zones?
