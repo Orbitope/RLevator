@@ -239,10 +239,9 @@ namespace ElevatorRL.Editor
         static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
             string modelPath, int obsSize, bool multiAgent = false, bool attention = false,
             int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0,
-            string obsConfigAssetPath = null)
+            string obsConfigAssetPath = null, TrafficPattern pattern = TrafficPattern.UpPeak)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
-            const TrafficPattern pattern = TrafficPattern.UpPeak;
             int[] seeds = { 1, 2, 3, 4, 5 };
 
             var modelAsset = AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>(modelPath);

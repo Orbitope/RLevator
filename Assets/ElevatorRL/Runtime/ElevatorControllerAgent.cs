@@ -56,6 +56,12 @@ namespace ElevatorRL
         public Building Sim => _b;
 
         Building _b;
+        // Runtime clone of trafficConfig so E12 can override the traffic pattern / day-cycle per
+        // training run via ML-Agents environment parameters (traffic_pattern, use_day_cycle) WITHOUT
+        // editing the shared asset or rebuilding — one headless build per size then serves every
+        // pattern. See OnEpisodeBegin and EXPERIMENT_PLAN.md E12.
+        TrafficConfig _traffic;
+        bool _loggedTraffic;
         float _clock;
         int _decisions;
 
@@ -65,7 +71,10 @@ namespace ElevatorRL
 
         public override void Initialize()
         {
-            _b = new Building(buildingConfig, rewardConfig, observationConfig, trafficConfig, seed);
+            // Clone so per-run env-parameter overrides (traffic_pattern/use_day_cycle) don't mutate
+            // the shared TrafficConfig asset. Falls back to the asset's baked values when unset.
+            _traffic = trafficConfig != null ? Instantiate(trafficConfig) : null;
+            _b = new Building(buildingConfig, rewardConfig, observationConfig, _traffic, seed);
 
             int E = buildingConfig.numElevators;
             _target = new int[E];
@@ -88,6 +97,23 @@ namespace ElevatorRL
             var ep = Academy.Instance.EnvironmentParameters;
             float v = ep.GetWithDefault("active_elevators", -1f);
             if (v > 0f) forced = Mathf.RoundToInt(v);
+
+            // E12: per-run traffic override. traffic_pattern = 0..4 (UpPeak/DownPeak/Lunch/Midday/
+            // Uniform); use_day_cycle = 0/1. Either < 0 leaves the asset's baked value untouched.
+            if (_traffic != null)
+            {
+                float pat = ep.GetWithDefault("traffic_pattern", -1f);
+                if (pat >= 0f) _traffic.defaultPattern = (TrafficPattern)Mathf.RoundToInt(pat);
+                float day = ep.GetWithDefault("use_day_cycle", -1f);
+                if (day >= 0f) _traffic.useDayCycle = day > 0.5f;
+
+                if (!_loggedTraffic)
+                {
+                    _loggedTraffic = true;
+                    Debug.Log($"[E12] traffic override active: pattern={_traffic.defaultPattern} " +
+                              $"useDayCycle={_traffic.useDayCycle} (env params traffic_pattern={pat}, use_day_cycle={day})");
+                }
+            }
 
             _b.Reset(forced);
             _clock = 0f;

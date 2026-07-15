@@ -91,6 +91,12 @@ namespace ElevatorRL.Editor
         [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Omniscient Obs Config")]
         static void PointAgentAtObsOmniscient() => PointAgentAtObsConfig("ObservationConfig_Omniscient");
 
+        // Baseline observation (the default ObservationConfig used by all E2/E3/E6 headline runs incl.
+        // bignet2). Use this to wire the scene back to baseline obs for E12 traffic-pattern runs, which
+        // reuse bignet2's recipe (768x4, baseline obs) so traffic pattern is the only variable.
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Baseline Obs Config")]
+        static void PointAgentAtObsBaseline() => PointAgentAtObsConfig("ObservationConfig");
+
         static void PointAgentAtObsConfig(string assetName)
         {
             var go = GameObject.Find("ElevatorController");
