@@ -1,0 +1,32 @@
+# config/elevator_ppo_e3_m_bignet2.yaml — flat-MLP rung M, bigger still (EXPERIMENT_PLAN.md E6-bignet2)
+#   mlagents-learn config/elevator_ppo_e3_m_bignet2.yaml --run-id=<name>
+#
+# One size up from elevator_ppo_e3_m_bignet.yaml (512 hidden units x 3 layers, which got within -4%
+# of LOOK/ETA at 10M steps but was showing diminishing returns). Bumps both width and depth:
+# 768 hidden units x 4 layers. Same obs/action/hyperparameters as every other flat-MLP M run so
+# network size is the only variable -- decisive test of whether bignet's gains keep compounding or
+# have topped out (see EXPERIMENT_PLAN.md E6's "NEXT" note for the decision rule).
+behaviors:
+  ElevatorController:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 768
+      num_layers: 4
+      normalize: true
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 5.0e6
+    time_horizon: 256
+    summary_freq: 20000
