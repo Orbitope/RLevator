@@ -378,6 +378,16 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Arms:** toggle `ObservationConfig` blocks — {full state} vs {buttons+queue-len only,
   "realistic"} vs {+ wait-age}. Cheap: config-only, no code.
 - **Metric:** convergence performance per obs set; expect wait-age to matter most on Z/H.
+- **In progress (2026-07-15):** three `ObservationConfig` assets created
+  (`ObservationConfig_FullState`/`_Realistic`/`_RealisticPlusWaitAge`) with menu items
+  (`Tools/Elevator RL/E5 Obs Ablations/...`) to swap the agent's obs config and rebake
+  `VectorObservationSize`. All three arms use bignet2's exact network (768×4) on rung M — obs is
+  the only variable, per the plan's note that scaling capacity for a ~15% wider input isn't
+  warranted (full-state only adds 39 floats to M's 254-float baseline; the first-layer weight
+  matrix scales with input width automatically regardless of hidden_units/num_layers).
+  **Arm 1 (full-state) launched** as `elev-e5-m-fullstate-01`
+  (`config/elevator_ppo_e5_m_fullstate.yaml`), 5M steps. Arms 2 (realistic) and 3
+  (realistic+wait-age) queued to follow sequentially.
 
 ### E6 — Architecture: flat MLP vs. shared per-car vs. attention — **DONE, result: bigger flat MLP matches LOOK/ETA; both new architectures rejected**
 - **Q:** Does weight sharing / attention over cars unlock the large-fleet rungs (L/H)?
