@@ -34,10 +34,14 @@ namespace ElevatorRL
         public bool timeOfDay = false;    // 2   (sin, cos of day phase)
         public bool pattern = false;      // 5   (one-hot traffic regime)
 
-        [Tooltip("EXACT destination histogram for every waiting AND in-car rider -- not a real " +
-            "controller signal (no real elevator system knows destinations before boarding), " +
-            "purely a ceiling/ablation to measure how much performance is left on the table if the " +
-            "policy could see who's going where, not just that/how-many are waiting. " +
+        [Tooltip("EXACT destination histogram for every waiting AND in-car rider. The HALL portion " +
+            "(2 x F x F) is a faithful model of a Destination Control System (DCS: Schindler " +
+            "Miconic/PORT, Otis Compass, KONE, TK) where riders enter their destination at a lobby " +
+            "kiosk/keycard BEFORE boarding -- so pre-boarding destinations ARE a real, deployed " +
+            "signal, most valuable in interfloor-heavy buildings. The in-car E x F portion goes " +
+            "beyond DCS (a real car knows its own selected destinations but not un-selected riders' " +
+            "intent) and is the ceiling/ablation part. See EXPERIMENT_PLAN.md E12: the DCS-realistic " +
+            "test drops the in-car block and keeps only the hall destinations. " +
             "2 x F x F (hall up/down, per origin floor, per destination floor) + E x F (per car, " +
             "per destination floor).")]
         public bool omniscientDestinations = false;

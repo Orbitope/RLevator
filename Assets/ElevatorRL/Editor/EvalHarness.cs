@@ -203,6 +203,15 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e5_omniscient.onnx", obsSize: 885,
             obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_Omniscient.asset");
 
+        // E5 Arm 1 (full-state obs, 1024x5). obsSize=293 = full-state baseline (all blocks on EXCEPT
+        // omniscientDestinations), the exact 293 that the Omniscient arm adds its 592 on top of.
+        // MUST pass obsConfigAssetPath or PPO gets a default-config observation (see the eval-harness
+        // bug fixed in the omniscient arm).
+        [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Run Sweep (LOOK vs ETA vs PPO, rung M, full-state, 5M steps, seeds 1-5)")]
+        static void RunE5SweepMFullState() => RunScaleLadderSweep("M-e5-fullstate", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e5_fullstate.onnx", obsSize: 293,
+            obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_FullState.asset");
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),

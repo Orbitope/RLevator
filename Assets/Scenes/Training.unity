@@ -202,7 +202,7 @@ MonoBehaviour:
   MaxStep: 0
   buildingConfig: {fileID: 11400000, guid: 44aa47e33ae50463d84a48008b0f7504, type: 2}
   rewardConfig: {fileID: 11400000, guid: 460ace6cf67634c96bf94edeb763f269, type: 2}
-  observationConfig: {fileID: 11400000, guid: e4d4132314d47f31c4141516c8dafb14, type: 2}
+  observationConfig: {fileID: 11400000, guid: b1a1e001f1a14d0e9e1e3c2f5b6a7d81, type: 2}
   trafficConfig: {fileID: 11400000, guid: e4019b755c98743f6b4dff53ace1b53b, type: 2}
   actionSpace: 0
   episodeDecisionLimit: 2048
@@ -221,7 +221,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.ML-Agents::Unity.MLAgents.Policies.BehaviorParameters
   m_BrainParameters:
-    VectorObservationSize: 885
+    VectorObservationSize: 293
     NumStackedVectorObservations: 1
     m_ActionSpec:
       m_NumContinuousActions: 0

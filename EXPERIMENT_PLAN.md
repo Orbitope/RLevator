@@ -815,6 +815,68 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Metric:** same 5-seed UpPeak sweep protocol; compare against whatever the current best flat-MLP
   recipe is at the time (bignet2 or later), not just the original E6-B result.
 
+### E12 — Traffic-pattern realism: interfloor / two-way / day-cycle *(NEXT — promoted ahead of E7-E11)*
+- **Motivating discovery (2026-07-15):** **every experiment to date (E2-E6) trained AND evaluated on
+  UpPeak only** — `Config/TrafficConfig.asset` has `defaultPattern: 0 (UpPeak)`, `useDayCycle: 0`,
+  and `EvalHarness.RunScaleLadderSweep` hardcodes `const TrafficPattern pattern =
+  TrafficPattern.UpPeak`. UpPeak is a **single-lobby-hub** pattern, which is precisely the case where
+  greedy collective control (LOOK) is near-optimal *by construction* — so "RL only matches LOOK/ETA
+  at rung M" (E6) was measured on the heuristics' best-case home turf and the *least* favorable
+  pattern for a learned policy. This likely explains the whole "parity, not victory" story.
+- **Q:** Does the RL-vs-LOOK/ETA gap **invert** (RL opens a real lead) under interfloor and two-way
+  traffic, where destinations/origins are distributed building-wide and greedy dispatch leaves the
+  most on the table? And does a single day-cycle **generalist** hold up across patterns vs. a real
+  building's shifting demand?
+- **Grounding (literature, see 2026-07-15 research):**
+  - Traffic is a standard 3-way mix incoming:outgoing:interfloor. CIBSE Guide D lunch template
+    **45:45:10**, Barney & Al-Sharif **40:40:20**; interfloor is typically **10-30%** of peak demand
+    and *dominant* in **residential, hospital, hotel, mixed-use** buildings. UpPeak is a worst-case
+    *sizing* scenario, not typical daily operation.
+  - The canonical RL-elevator result (**Crites & Barto, NeurIPS 1996**; Sutton & Barto §11.4) trained
+    on a **down-peak profile WITH up + interfloor traffic**, 10 floors / 4 cars — RL's demonstrated
+    advantage was never on pure up-peak. The 2024 *Adv. Eng. Informatics* "Traffic Pattern-Aware
+    Elevator Dispatching via Deep RL" (D3QN/SMDP) makes traffic-pattern-awareness across
+    up/down/lunch/interfloor its central thesis.
+  - **Destination Control Systems** (Schindler Miconic/PORT, Otis Compass, KONE, TK) take the rider's
+    destination at a lobby kiosk/keycard **before boarding** (~25% trip-time / ~30% capacity gains),
+    so the E5 `omniscientDestinations` HALL block (2×F×F) is a **realistic DCS signal**, not purely
+    hypothetical — and DCS is most valuable exactly in interfloor-heavy buildings. (Tooltip in
+    `ObservationConfig.cs` corrected accordingly.) The in-car E×F block remains beyond-DCS ceiling.
+- **What's already in place (no new sim code needed for the patterns themselves):**
+  `PassengerArrivals.LoadPattern` already implements all five: **UpPeak** (lobby→up, weak interfloor),
+  **DownPeak** (up→lobby, weak interfloor), **Lunch** (genuine two-hub two-way: lobby+top),
+  **Midday/Uniform** (pure building-wide interfloor — every origin→every dest equally). `useDayCycle`
+  already auto-selects the pattern by sim time. The missing pieces are plumbing, not simulation.
+- **Arms (decided 2026-07-15: BOTH specialists + generalist, sizes M and L):**
+  1. **Per-pattern specialists** — train one policy per {UpPeak (have for M via bignet2), DownPeak,
+     Lunch, Interfloor(Midday/Uniform)} × {M, L}, each on its single fixed pattern. Isolates the
+     per-pattern RL-vs-heuristic ceiling. Expectation: near-parity on UpPeak/DownPeak (single-hub),
+     **RL lead emerges on Lunch and especially Interfloor.**
+  2. **Day-cycle generalist** — one policy per size {M, L} trained with `useDayCycle: 1` so it sees
+     all patterns within an episode. Tests the realistic single-controller case; compare to the
+     specialists (does one policy match N specialists, à la the 2024 unified-model result?).
+  - Fold in **E8's "pattern transfer"** here: eval each specialist on the OTHER patterns to measure
+    brittleness (e.g. UpPeak-specialist under Interfloor) — the generalist should dominate that
+    off-pattern regime.
+- **Implementation steps (plumbing):**
+  1. **Parametrize the eval harness on pattern:** add a `TrafficPattern` arg to `RunScaleLadderSweep`
+     (replace the hardcoded UpPeak) + per-pattern menu items; for the generalist add a full day-cycle
+     eval episode (`useDayCycle` on) reporting per-pattern-segment stats. LOOK/ETA are re-run on each
+     pattern as the per-pattern baseline (they need no retraining).
+  2. **Training configs:** per-pattern `TrafficConfig` assets (or a config field) for the specialists;
+     a day-cycle `TrafficConfig` for the generalist. Same 1024×5 net + PPO hypers as bignet2/E5 so
+     traffic pattern is the only variable.
+  3. **Re-evaluate the E5 omniscient arm here** — its natural proving ground. Run both framings:
+     (a) full `omniscientDestinations` (DCS + beyond), (b) hall-only DCS-realistic variant (drop the
+     in-car E×F block — needs a small `ObservationConfig`/`Building.WriteObservation` toggle).
+- **Metric:** per-pattern 5-seed sweeps, delivered + waitMean + **waitP95/waitMax** (tail matters more
+  under interfloor) vs. LOOK/ETA, per rung. **Headline figure:** RL−LOOK gap as a function of traffic
+  pattern (expect the gap to swing from ~0 on UpPeak to clearly positive on Interfloor). Secondary:
+  generalist-vs-specialists, and omniscient/DCS-obs lift by pattern.
+- **Note:** this reframes E3's "scale ladder" headline — the honest thesis figure is now RL−LOOK gap
+  over *both* axes (building size AND traffic pattern), not size alone. E10 (avg-vs-tail-wait reward)
+  becomes more meaningful after E12 and should follow it.
+
 ---
 
 ## 5. Metrics & reporting
