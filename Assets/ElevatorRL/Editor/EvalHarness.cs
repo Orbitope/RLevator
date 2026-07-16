@@ -221,6 +221,22 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e12_interfloor_10m.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday);
 
+        // E13a: LSTM/recurrent model on interfloor. Uses RecurrentPpoDispatcher (threads recurrent
+        // hidden state); memorySize=128 matches network_settings.memory.memory_size. Copy the run's
+        // ONNX to this path first. CONFIRM recurrent_in width via onnx.load before trusting numbers.
+        [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-LSTM, rung M, interfloor, seeds 1-5)")]
+        static void RunE13SweepMInterfloorMemory() => RunScaleLadderSweep("M-e13-interfloor-memory", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_memory.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, recurrent: true, memorySize: 128);
+
+        // E13b: floor-axis conv model on interfloor. Uses ConvDispatcher (obs_0 visual grid + obs_1
+        // flat vector); gridFeatures=8 = Building.FloorGridFeatures. Copy the run's ONNX to this path
+        // first. CONFIRM obs input mapping + visual tensor layout via onnx.load before trusting.
+        [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-conv, rung M, interfloor, seeds 1-5)")]
+        static void RunE13SweepMInterfloorConv() => RunScaleLadderSweep("M-e13-interfloor-conv", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures);
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),
@@ -248,7 +264,8 @@ namespace ElevatorRL.Editor
         static void RunScaleLadderSweep(string rungName, int floors, int cars, int capacity,
             string modelPath, int obsSize, bool multiAgent = false, bool attention = false,
             int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0,
-            string obsConfigAssetPath = null, TrafficPattern pattern = TrafficPattern.UpPeak)
+            string obsConfigAssetPath = null, TrafficPattern pattern = TrafficPattern.UpPeak,
+            bool recurrent = false, int memorySize = 0, bool conv = false, int gridFeatures = 0)
         {
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
             int[] seeds = { 1, 2, 3, 4, 5 };
@@ -278,8 +295,11 @@ namespace ElevatorRL.Editor
 
             var ppoMulti = multiAgent ? new MultiAgentPpoDispatcher(modelAsset, obsSize) : null;
             var ppoAttn = attention ? new AttentionDispatcher(modelAsset, globalObsSize, carEntitySize, maxNumObservables) : null;
-            var ppoFlat = (multiAgent || attention) ? null : new PpoDispatcher(modelAsset, obsSize);
-            Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : attention ? ppoAttn.Dispatch : ppoFlat.Dispatch;
+            var ppoRec = recurrent ? new RecurrentPpoDispatcher(modelAsset, obsSize, memorySize) : null;   // E13a LSTM
+            var ppoConv = conv ? new ConvDispatcher(modelAsset, obsSize, floors, gridFeatures) : null;     // E13b floor-conv
+            var ppoFlat = (multiAgent || attention || recurrent || conv) ? null : new PpoDispatcher(modelAsset, obsSize);
+            Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : attention ? ppoAttn.Dispatch
+                : recurrent ? ppoRec.Dispatch : conv ? ppoConv.Dispatch : ppoFlat.Dispatch;
 
             var rows = new List<string> {
                 "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
@@ -314,6 +334,8 @@ namespace ElevatorRL.Editor
             }
             ppoMulti?.Dispose();
             ppoAttn?.Dispose();
+            ppoRec?.Dispose();
+            ppoConv?.Dispose();
             ppoFlat?.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
