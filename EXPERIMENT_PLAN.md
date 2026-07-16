@@ -926,13 +926,20 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   built-in recurrent policy (`network_settings.memory`, seq_len 64 / mem 128). Pure config change — no
   C#, no new build, runs against the existing M headless build. If it matches the -14.4% baseline →
   the task really is Markovian and temporal memory is a dead end; a clear gain → history matters.
-  Launched 2026-07-15 ~20:20, healthy (reward ~-40k @ 60-80k steps → -32.8k @ 440k, tracking the
-  baseline's early curve; ~10% slower/step due to LSTM). 5M first, extend if climbing, then eval on
-  Midday. **Eval gotcha:** a recurrent policy must have its hidden state threaded through each
-  inference step (feed `recurrent_in`, carry `recurrent_out`); the stateless `PpoDispatcher` would
-  feed zeroed memory every step and behave degenerately (same failure class as the E5 obs-config
-  bug). So the memory-run eval needs a recurrent-aware dispatcher, not the existing one — build +
-  confirm input names via onnx.load when the model lands.
+  Launched 2026-07-15 ~20:20. **RESULT: ABANDONED as a negative result at 1.9M/5M steps (killed
+  2026-07-15 ~21:15 per user — "not worth the time").** The LSTM tracked *consistently and wideningly
+  BEHIND* the plain baseline at matched steps — memory −33.5k @ 1M / −31.7k @ 1.9M vs. baseline
+  −29.3k @ 1M / −24.9k @ 2M — i.e. temporal memory made convergence slower, not better, with no sign
+  of closing the gap. **Conclusion: the interfloor dispatch task is effectively Markovian** (matches
+  Crites&Barto and the 2024 D3QN paper, both single-snapshot); per-tick history is not the missing
+  ingredient. Reward-trajectory comparison at matched steps was decisive enough to not spend the full
+  5-10M budget. The `RecurrentPpoDispatcher` + eval wiring built for it are kept (cheap, and document
+  the recurrent-eval gotcha below) but no model was evaluated. **Pivot: E13b spatial conv is now the
+  primary architecture bet.**
+  - *(Eval gotcha, retained for reference)* a recurrent policy needs its hidden state threaded through
+    each inference step (feed `recurrent_in`, carry `recurrent_out`); the stateless `PpoDispatcher`
+    would feed zeroed memory every step and behave degenerately (same failure class as the E5
+    obs-config bug) — hence `RecurrentPpoDispatcher` exists if we ever revisit recurrent policies.
 - **E13b — floor-axis spatial conv [CODE BUILT, not yet trained].** The native analog of the paper's
   Conv1d-over-floors, done WITHOUT custom torch (avoiding this project's prior onnxscript/ONNX-export
   fragility) by emitting per-floor features as a visual grid so ML-Agents' built-in CNN convolves over
