@@ -493,9 +493,14 @@ namespace ElevatorRL
         // impurity vs. a true 1D conv -- the point is the height/floor axis), 8 features so width>=5.
         public const int FloorGridFeatures = 8;
 
-        public void WriteFloorGrid(ObservationWriter writer)
+        // Single source of truth for the per-floor grid features, written into a flat buffer in
+        // height-major/width-minor order: buf[f * FloorGridFeatures + c]. Both the training-side
+        // FloorGridSensor (via WriteFloorGrid) and the eval-side ConvDispatcher call this so the two
+        // paths cannot drift.
+        public void FillFloorGrid(float[] buf)
         {
             int F = cfg.numFloors, E = cfg.numElevators;
+            float invE = E > 0 ? 1f / E : 0f;
             for (int f = 0; f < F; f++)
             {
                 int carsHere = 0, carsWant = 0;
@@ -505,17 +510,28 @@ namespace ElevatorRL
                     if (cars[i].Floor == f) carsHere++;
                     if (cars[i].WantsFloor(f)) carsWant++;
                 }
-                float invE = E > 0 ? 1f / E : 0f;
-                // writer[channel, height=floor, width=feature]
-                writer[0, f, 0] = upQ[f].Count > 0 ? 1f : 0f;
-                writer[0, f, 1] = downQ[f].Count > 0 ? 1f : 0f;
-                writer[0, f, 2] = OldestWaitFrac(upQ[f]);
-                writer[0, f, 3] = OldestWaitFrac(downQ[f]);
-                writer[0, f, 4] = Mathf.Min(1f, upQ[f].Count / (float)cfg.maxQueue);
-                writer[0, f, 5] = Mathf.Min(1f, downQ[f].Count / (float)cfg.maxQueue);
-                writer[0, f, 6] = carsHere * invE;
-                writer[0, f, 7] = carsWant * invE;
+                int o = f * FloorGridFeatures;
+                buf[o + 0] = upQ[f].Count > 0 ? 1f : 0f;
+                buf[o + 1] = downQ[f].Count > 0 ? 1f : 0f;
+                buf[o + 2] = OldestWaitFrac(upQ[f]);
+                buf[o + 3] = OldestWaitFrac(downQ[f]);
+                buf[o + 4] = Mathf.Min(1f, upQ[f].Count / (float)cfg.maxQueue);
+                buf[o + 5] = Mathf.Min(1f, downQ[f].Count / (float)cfg.maxQueue);
+                buf[o + 6] = carsHere * invE;
+                buf[o + 7] = carsWant * invE;
             }
+        }
+
+        float[] _gridScratch;
+        public void WriteFloorGrid(ObservationWriter writer)
+        {
+            int F = cfg.numFloors;
+            if (_gridScratch == null || _gridScratch.Length != F * FloorGridFeatures)
+                _gridScratch = new float[F * FloorGridFeatures];
+            FillFloorGrid(_gridScratch);
+            for (int f = 0; f < F; f++)
+                for (int c = 0; c < FloorGridFeatures; c++)
+                    writer[0, f, c] = _gridScratch[f * FloorGridFeatures + c]; // [channel, height=floor, width=feature]
         }
 
         // ---------------------------------------------------------------- per-car observation (E6)
