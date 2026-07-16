@@ -978,6 +978,39 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     inductive bias is helping. Then eval on Midday vs LOOK/ETA (menu `E13 Conv/Run Sweep ...PPO-conv`;
     a good training reward that evals to ~0 would signal a residual ConvDispatcher obs-value bug to
     debug, same class as the E5 bug).
+  - **RESULT (2026-07-16 ~01:11): floor-axis conv is the FIRST architecture to beat the flat MLP on
+    interfloor — a clear, durable sample-efficiency WIN.** Completed 5M steps. On the
+    (observation/dispatcher-independent) training-reward axis, the conv led the flat MLP at *every*
+    matched step by ~+3-4.5k reward, the whole run:
+    | Step | flat MLP | conv | conv adv |
+    |------|----------|------|----------|
+    | 500k | -34,214 | -30,233 | +3,981 |
+    | 1.04M | -28,134 | -24,729 | +3,405 |
+    | 1.66M | -26,918 | -22,619 | +4,299 |
+    | 2.38M | -24,173 | -19,707 | +4,466 |
+    | 3.1M  | -20,947 | -17,277 | +3,670 |
+    | 3.9M  | -19,362 | -16,360 | +3,002 |
+    | 5M    | **-17,277** | **~-15,100** | +~2,200 |
+    Headline framing: **conv @3.1M (-17,277) already equals the flat MLP's FULL 5M value** → ~38%
+    fewer samples to reach the same performance; and conv @5M (~-15,100) surpasses the flat MLP's 5M
+    ceiling, landing roughly where the flat MLP was at ~7-8M. This is the interfloor gap's first real
+    dent from the architecture side (vs. the LSTM which made it worse). Model saved
+    `results/elev-e13-m-interfloor-conv-01/`.
+  - **[EVAL PENDING — infra-blocked, NOT a result] delivered-passenger sweep not yet obtained.**
+    First eval attempts showed PPO delivered=0, but this is a **stale-model-import artifact, not the
+    conv policy**: `cp`-ing the new ONNX over the existing eval path left Unity serving the OLD cached
+    import (auto-import is Editor-focus-gated), so the sweep evaluated stale/undertrained weights.
+    **Fixed** (commit `fb04701`): `RunScaleLadderSweep` now `AssetDatabase.ImportAsset(...,
+    ForceUpdate)` before load, and the conv model was copied to a fresh `_5m.onnx` path. Could not
+    complete the corrected sweep this session: the Unity MCP bridge went unresponsive again and a
+    clean Editor restart hung at startup (past 01:20, licensing stage, 0% CPU). **To finish (one
+    clean Editor session):** recompile → run menu `E13 Conv/Run Sweep (...PPO-conv...)` → expect a
+    sane delivered count (~2000+, comparable-to-better than the flat MLP's interfloor 2242 given the
+    reward win). The training-level WIN above stands independently of this.
+  - **NEXT after eval:** (1) extend conv 5M→10M for a converged apples-to-apples vs the flat MLP's
+    10M (-13,652) — conv was still climbing at 5M; (2) if the win holds, conv becomes the interfloor
+    (and likely general) recipe → re-run the other E12 patterns (Lunch/DownPeak/DayCycle) and rung L
+    on the conv architecture; (3) the reused `RecurrentPpoDispatcher`/LSTM path stays shelved.
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
