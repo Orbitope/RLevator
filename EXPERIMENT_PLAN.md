@@ -926,8 +926,13 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   built-in recurrent policy (`network_settings.memory`, seq_len 64 / mem 128). Pure config change — no
   C#, no new build, runs against the existing M headless build. If it matches the -14.4% baseline →
   the task really is Markovian and temporal memory is a dead end; a clear gain → history matters.
-  Launched 2026-07-15 ~20:20, healthy (reward ~-40k @ 60-80k steps, tracking the baseline's early
-  curve; ~10% slower/step due to LSTM). 5M first, extend if climbing, then eval on Midday.
+  Launched 2026-07-15 ~20:20, healthy (reward ~-40k @ 60-80k steps → -32.8k @ 440k, tracking the
+  baseline's early curve; ~10% slower/step due to LSTM). 5M first, extend if climbing, then eval on
+  Midday. **Eval gotcha:** a recurrent policy must have its hidden state threaded through each
+  inference step (feed `recurrent_in`, carry `recurrent_out`); the stateless `PpoDispatcher` would
+  feed zeroed memory every step and behave degenerately (same failure class as the E5 obs-config
+  bug). So the memory-run eval needs a recurrent-aware dispatcher, not the existing one — build +
+  confirm input names via onnx.load when the model lands.
 - **E13b — floor-axis spatial conv [CODE BUILT, not yet trained].** The native analog of the paper's
   Conv1d-over-floors, done WITHOUT custom torch (avoiding this project's prior onnxscript/ONNX-export
   fragility) by emitting per-floor features as a visual grid so ML-Agents' built-in CNN convolves over
