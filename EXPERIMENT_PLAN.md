@@ -962,6 +962,31 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
+- **Editor-vs-training instability (confirmed 2026-07-15):** the Unity Editor cannot reliably serve
+  the MCP bridge while a 20-env training run saturates the machine — cheap reads (`get_scene_info`)
+  slip through but menu-execute/build/recompile stall the main thread and freeze it (needs a manual
+  window-focus or a force-kill+relaunch). **Decision (user): let the E13a memory run finish (~2h),
+  then batch ALL Editor-dependent work in one stable session with the machine free.** All
+  Editor-INDEPENDENT prep is done and committed ahead of that session: both eval dispatchers
+  (`RecurrentPpoDispatcher` for E13a, `ConvDispatcher` for E13b), the recurrent/conv branches +
+  menu items in `RunScaleLadderSweep`, the conv sensor/component/menu, and both configs.
+- **POST-MEMORY BATCH CHECKLIST (mechanical; minimize Editor exposure):**
+  1. `cp results/elev-e13-m-interfloor-memory-01/ElevatorController.onnx
+     Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_memory.onnx`
+  2. Recompile (verify all E13 C# compiles clean — sensor, 2 dispatchers, eval wiring).
+  3. **E13a eval:** run menu `Tools/Elevator RL/E13 Conv/Run Sweep (...PPO-LSTM...)`. Sanity-check the
+     result isn't degenerate (would signal the `recurrent_in` width ≠ 128 — confirm via onnx.load).
+     Document result vs the -14.4% baseline; if memory doesn't help, temporal-history hypothesis is
+     dead and E13b (spatial conv) becomes the main bet.
+  4. **E13b build+de-risk:** menu Point Agent At Baseline Obs → E13 Conv/Add Floor-Grid Sensor →
+     Build Headless Trainer. Then a SHORT conv smoke-train (`config/elevator_ppo_e13_interfloor_conv.yaml`,
+     max_steps tiny) to export an ONNX; onnx.load it to confirm obs_0=visual/obs_1=flat + the visual
+     tensor layout (NHWC vs NCHW) BEFORE the full run. Fix `ConvDispatcher._visualShape` if needed.
+  5. If export/inference OK → full conv train (5M, extend if climbing) → copy ONNX to
+     `ElevatorController_M_e13_interfloor_conv.onnx` → run menu `E13 Conv/Run Sweep (...PPO-conv...)`.
+  6. Also still-pending from before the freeze (decide if worth it given the memory result): the
+     pattern-aware interfloor retrain (`ObservationConfig_PatternAware` + `..._patternaware.yaml`
+     already created; needs Point Agent At Pattern-Aware Obs → rebuild → train → eval).
 
 ---
 
