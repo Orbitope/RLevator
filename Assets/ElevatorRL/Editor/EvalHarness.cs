@@ -212,6 +212,15 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e5_fullstate.onnx", obsSize: 293,
             obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_FullState.asset");
 
+        // E12 traffic-pattern realism: interfloor specialist (Midday, enum 3), rung M, bignet2 recipe
+        // (768x4, baseline obs, obsSize=254 same as UpPeak bignet2), 5M->10M (reward plateaued at
+        // 10M, see EXPERIMENT_PLAN.md E12). LOOK/ETA are re-run under the SAME pattern via the
+        // `pattern` arg so the comparison is apples-to-apples (not vs. their UpPeak numbers).
+        [MenuItem("Tools/Elevator RL/E12 Traffic Patterns/Run Sweep (LOOK vs ETA vs PPO, rung M, interfloor, 10M steps, seeds 1-5)")]
+        static void RunE12SweepMInterfloor() => RunScaleLadderSweep("M-e12-interfloor-10M", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e12_interfloor_10m.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday);
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),
@@ -308,7 +317,7 @@ namespace ElevatorRL.Editor
             ppoFlat?.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E3-sweep-{rungName}-UpPeak");
+            string outDir = Path.Combine(projectRoot, "Runs", $"{DateTime.Now:yyyyMMdd-HHmmss}-E3-sweep-{rungName}-{pattern}");
             StatsCsv.Write(Path.Combine(outDir, "sweep_summary.csv"), rows[0], rows.GetRange(1, rows.Count - 1));
             Debug.Log($"[Eval] {rungName} sweep complete — {outDir}/sweep_summary.csv");
         }

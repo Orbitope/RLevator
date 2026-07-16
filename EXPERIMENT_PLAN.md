@@ -886,11 +886,77 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Infra: runtime override + eval param + 4 YAMLs (`config/elevator_ppo_e12_{downpeak,lunch,interfloor,daycycle}.yaml`) — DONE, committed `fdf276e`. Override verified in headless: `[E12] traffic override active: pattern=Midday` (env param traffic_pattern=3 → Midday), and interfloor reward scale (~-41k@40k) differs from UpPeak (~-26k@40k), confirming the pattern really changed.
   - M build (baseline obs, VectorObservationSize=254, 5 branches) — DONE (`Builds/HeadlessTrainer/RLevatorTrainer.app`, 15:14 mtime).
   - **`elev-e12-m-interfloor-01`: DONE, training complete at 10M steps** (5M then extended per protocol — reward was still climbing at the 5M cutoff: -29,263→-17,277; the last 500K-step delta was ambiguous vs. noise so extended). Final reward -13,652, clearly plateaued over the last 1M steps (oscillating -13,300 to -14,700 with no further trend) — this is convergence. Model copied to `Assets/ElevatorRL/Models/ElevatorController_M_e12_interfloor_10m.onnx`, eval menu item added (`EvalHarness.cs`, `RunE12SweepMInterfloor`, pattern=Midday, obsSize=254).
-  - **[BLOCKED, 2026-07-15 ~19:06–19:22] Eval sweep not yet run — needs human action.** The Unity Editor's MCP bridge went fully unresponsive while setting up this eval (process alive, ~1% CPU idle, WebSocket TCP sockets correctly established both directions, but zero incoming requests logged in `Editor.log` despite many attempts across ~16 minutes). Diagnosed as likely macOS App Nap throttling after the Editor sat backgrounded for days during headless training (which doesn't touch the Editor at all). Escalation tried, in order: (1) quit + relaunched the Editor cleanly (no uncommitted scene changes existed) — bridge reconnected with a fresh WS handshake but **still zero requests reaching it**; (2) requested computer-use access to visually check for a stuck dialog — access to the Unity app was granted, but the screenshot tool itself failed (`SCContentFilter failure` — macOS Screen Recording permission not granted at the OS level, which only the user can grant in System Settings). **All autonomous diagnostic/remediation paths are now exhausted.** This is NOT a training-blocking issue (headless runs are independent standalone processes) but DOES block any further eval/build/menu-item work until resolved. **Needs the user to either: (a) click on/check the Unity Editor window directly (there's likely a stuck dialog to dismiss), or (b) grant Screen Recording permission to Claude's computer-use tool in System Settings > Privacy & Security so it can be diagnosed visually.** Will keep periodically retrying `get_scene_info` in case it self-resolves, but has stopped attempting further remediation without user input.
+  - **[RESOLVED 2026-07-15 ~19:33] Unity MCP bridge blocker.** User manually focused/clicked the Unity Editor window; bridge responded immediately after (`get_scene_info` succeeded on the next call). Confirms this was an OS-level focus/App Nap issue, not a stuck dialog — no code or config change needed. Noted for future sessions: if the bridge goes unresponsive (alive, idle, sockets connected, zero requests logged) after the Editor has been backgrounded a long time, ask the user to click the window before spending more time on autonomous diagnosis.
+  - **`elev-e12-m-interfloor-01` eval — DONE. Result: SURPRISING, opposite the working hypothesis.** 5-seed sweep, rung M, interfloor (Midday) traffic, `Runs/20260715-193332-E3-sweep-M-e12-interfloor-10M-Midday/sweep_summary.csv`:
+
+    | Policy | delivered (mean) | abandoned (mean) | rejected | waitMean |
+    |---|---|---|---|---|
+    | LOOK  | 2619.8 | 1298.4 | 0 | 19.3s |
+    | ETA   | 2680.8 | 1239.0 | 0 | 19.5s |
+    | PPO   | **2241.8** | **1675.8** | 0 | 19.8s |
+
+    **PPO is 14.4% behind LOOK and 16.4% behind ETA** — a clearly worse gap than UpPeak's near-parity (bignet2: -0.4% vs LOOK, actually beat ETA). This directly contradicts the working hypothesis that interfloor/complex traffic is where RL should have the most room to beat greedy heuristics. The gap is driven almost entirely by **abandonment**, not rejection: nobody is turned away in this pattern (`rejected=0` for all three policies — interfloor's distributed demand apparently never saturates any single queue to the reject threshold), but PPO lets ~30% more riders time out waiting than LOOK/ETA does. PPO's reward is even negative (-1800 to -3451) vs. LOOK/ETA's positive 5000-8000 range, computed under the identical reward formula — so this isn't a metric-choice artifact, PPO is genuinely worse on every axis here.
+    - **This result should be trusted, not dismissed as undertraining** (learning from the omniscient-arm mistake above): the interfloor model trained cleanly to a converged 10M-step plateau (reward flat over the last 1M steps), matching the exact protocol that produced the winning bignet2 UpPeak result. No step-budget confound this time.
+    - **Working hypotheses for why (not yet tested):** (a) Midday's higher, more uniform arrival rate (`lambda=0.15` at every floor vs. UpPeak's `0.05` background + `0.9` lobby spike) may be pushing the whole system into a higher-utilization regime where LOOK's simple "car goes toward nearest unserved call" is closer to optimal and RL's learned policy — tuned on 5M-10M steps of a qualitatively different (hub-and-spoke) traffic distribution's local optima — hasn't found the right coordination strategy for spread-out demand; (b) the flat/joint MultiDiscrete action space (E6's winning architecture) may cope worse with interfloor precisely because there's no single obvious hub to greedily prioritize — more genuinely worth architecture study (E6 revisited, or E9's target-floor semi-MDP) than the flat action space handles well; (c) simple undertrained-relative-to-task-difficulty (10M steps may just not be enough for THIS harder traffic mix, even though the reward curve looks converged — a converged reward doesn't rule out a converged-to-a-worse-local-optimum scenario). Do not resolve this speculatively — gather the other 3 M patterns first (lunch/downpeak/daycycle) to see whether "PPO worse than heuristics" is interfloor-specific or a broader pattern-mismatch story, then revisit.
   - [QUEUED, M, in order] lunch → downpeak → daycycle. Each: 5M first (extend to 10M if still climbing), then eval on its OWN pattern vs LOOK/ETA, document here, commit.
   - [THEN] point agent at L preset (rebake to VectorObservationSize=648, 8 branches) → build L → run interfloor/lunch/downpeak/daycycle at L.
-  - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8).
-  - Headline to fill in: RL−LOOK delivered gap per pattern × size (expect ~0 on UpPeak/DownPeak, positive on Lunch/Interfloor).
+  - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
+  - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
+
+### E13 — Sequence/spatial architectures for the interfloor gap *(IN PROGRESS)*
+- **Trigger:** E12 interfloor loss (-14.4% vs LOOK). Hypothesis under test: the flat MLP over a
+  single-snapshot, concatenated observation lacks the inductive bias to handle spread-out interfloor
+  demand — it can't reason about (a) *temporal* context (how demand is evolving) or (b) *spatial*
+  floor-adjacency (a call 1 floor from a car vs. 10 floors away look like arbitrary vector indices).
+- **Literature grounding (from the 2024 Traffic-Pattern-Aware D3QN paper's source + Crites&Barto):**
+  - The 2024 paper's convolution is **spatial (Conv1d over the FLOOR axis)**, NOT temporal. Neither
+    it nor Crites&Barto feed any per-tick history — both are single-snapshot Markovian designs. Their
+    "temporal grouping with gradient surgery" is a *multi-task training trick* for unified
+    all-patterns training, not a sequence architecture.
+  - Both use a **single shared-weight network + a global/team reward** for joint per-car decisions
+    (2024: one Q-net outputs `q[car_id*5:(car_id+1)*5]` for all cars; C&B: one shared value fn per
+    car; reward accumulates into one controller-level `self.con.reward`). **This is exactly our
+    current design** — we are NOT missing "independent per-car agents"; we already tried the more
+    decentralized version (E6 Architecture A, per-car parameter-shared agents) and it failed to learn.
+  - So the genuine architectural gap vs. us is the **conv-over-floors encoder** + explicit
+    arrival-rate channels, not the agent/reward structure.
+- **E13a — recurrent memory (LSTM) probe [RUNNING].** Cheapest test of "does temporal history help,"
+  even though precedent says the task is Markovian. `elev-e13-m-interfloor-memory-01`
+  (`config/elevator_ppo_e13_interfloor_memory.yaml`): identical to the failed interfloor run + ML-Agents
+  built-in recurrent policy (`network_settings.memory`, seq_len 64 / mem 128). Pure config change — no
+  C#, no new build, runs against the existing M headless build. If it matches the -14.4% baseline →
+  the task really is Markovian and temporal memory is a dead end; a clear gain → history matters.
+  Launched 2026-07-15 ~20:20, healthy (reward ~-40k @ 60-80k steps, tracking the baseline's early
+  curve; ~10% slower/step due to LSTM). 5M first, extend if climbing, then eval on Midday.
+- **E13b — floor-axis spatial conv [CODE BUILT, not yet trained].** The native analog of the paper's
+  Conv1d-over-floors, done WITHOUT custom torch (avoiding this project's prior onnxscript/ONNX-export
+  fragility) by emitting per-floor features as a visual grid so ML-Agents' built-in CNN convolves over
+  the floor axis. Implemented this session:
+  - `Building.WriteFloorGrid(ObservationWriter)` + `Building.FloorGridFeatures=8` — per-floor state as
+    a (channels=1, height=F, width=8) grid: {hallUp, hallDown, upAge, downAge, upQlen, downQlen,
+    carsHere, carsWantHere}, same normalizations as the flat obs.
+  - `FloorGridSensor : ISensor` (pull-based, reads the live Building each Write) +
+    `FloorGridSensorComponent : SensorComponent` — drop the component next to the existing
+    `ElevatorControllerAgent` (no agent change; verified Agent.Initialize runs before
+    InitializeSensors so `agent.Sim` is live at CreateSensors time). The grid feeds ALONGSIDE the flat
+    VectorSensor (ML-Agents concatenates CNN + vector encoder outputs), so flat obs keeps carrying
+    car/global state.
+  - Editor menu `Tools/Elevator RL/E13 Conv/Add|Remove Floor-Grid Sensor To Agent`; config
+    `config/elevator_ppo_e13_interfloor_conv.yaml` with `vis_encode_type: match3` (small CNN, min-res
+    5 — OK for F>=5 floors x 8 feats).
+  - **Design caveat:** ML-Agents visual encoders are 2D, so the (F x 8) grid gets a 3x3 conv that also
+    mixes adjacent (arbitrarily-ordered) features — a minor impurity vs. a true 1D floor conv; the
+    floor-axis locality (the point) is captured.
+  - **Remaining before a result (needs the Unity Editor, currently the MCP-bridge bottleneck):**
+    (1) attach the component to the M build + rebuild headless; (2) train; (3) **eval needs a
+    visual-capable dispatcher** — the current `PpoDispatcher` feeds only `obs_0` (flat vector); a
+    conv model has a 2nd observation input (the grid), so eval must feed both (mirror
+    `AttentionDispatcher`'s multi-input handling). **OPEN RISK:** whether a match3 visual encoder
+    exports to ONNX and runs in Sentis inference is untested in this project — validate on a tiny run
+    before committing a full 5-10M-step budget.
+- **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
+  for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
+  has been destabilizing the Unity Editor.
 
 ---
 

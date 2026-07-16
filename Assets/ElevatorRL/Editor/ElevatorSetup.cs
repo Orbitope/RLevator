@@ -97,6 +97,40 @@ namespace ElevatorRL.Editor
         [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Baseline Obs Config")]
         static void PointAgentAtObsBaseline() => PointAgentAtObsConfig("ObservationConfig");
 
+        // Baseline + pattern one-hot (E12): gives the policy an explicit traffic-regime signal
+        // instead of making it infer the regime from indirect hall-call statistics. obsSize = 259
+        // (254 baseline + 5 pattern one-hot) on rung M.
+        [MenuItem("Tools/Elevator RL/E12 Traffic Patterns/Point Agent At Pattern-Aware Obs Config")]
+        static void PointAgentAtObsPatternAware() => PointAgentAtObsConfig("ObservationConfig_PatternAware");
+
+        // E13b: attach/detach the floor-axis conv observation pathway (FloorGridSensorComponent).
+        // Adds a (1 x F x 8) grid sensor next to the agent; train with vis_encode_type: match3. Toggle
+        // idempotently so re-running is safe. Rebuild the headless trainer after adding/removing.
+        [MenuItem("Tools/Elevator RL/E13 Conv/Add Floor-Grid Sensor To Agent")]
+        static void AddFloorGridSensor()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
+            if (go.GetComponent<FloorGridSensorComponent>() != null) { Debug.Log("[ElevatorRL] FloorGridSensorComponent already present."); return; }
+            go.AddComponent<FloorGridSensorComponent>();
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log("[ElevatorRL] Added FloorGridSensorComponent (floor-axis conv pathway). Rebuild the headless trainer.");
+        }
+
+        [MenuItem("Tools/Elevator RL/E13 Conv/Remove Floor-Grid Sensor From Agent")]
+        static void RemoveFloorGridSensor()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene."); return; }
+            var comp = go.GetComponent<FloorGridSensorComponent>();
+            if (comp == null) { Debug.Log("[ElevatorRL] No FloorGridSensorComponent to remove."); return; }
+            Object.DestroyImmediate(comp);
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log("[ElevatorRL] Removed FloorGridSensorComponent. Rebuild the headless trainer.");
+        }
+
         static void PointAgentAtObsConfig(string assetName)
         {
             var go = GameObject.Find("ElevatorController");

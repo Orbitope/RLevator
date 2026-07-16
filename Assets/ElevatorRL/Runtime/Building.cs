@@ -482,6 +482,42 @@ namespace ElevatorRL
             for (int d = 0; d < F; d++) sensor.AddObservation(Mathf.Min(1f, _destHistBuf[d] / norm));
         }
 
+        // ---- Floor-grid observation (EXPERIMENT_PLAN.md E13b: spatial floor-axis conv) ----
+        // Emits per-floor local state as a (1 x F x FloorGridFeatures) single-channel "image" so
+        // ML-Agents' visual CNN encoder (match3, min-res 5) convolves over the FLOOR axis -- the
+        // native analog of the 2024 Traffic-Pattern-Aware paper's Conv1d-over-floors, without any
+        // custom torch. The flat MLP treats floors as an unordered concatenation and cannot exploit
+        // floor adjacency (a call 1 floor from a car is very different from 10 floors away, but the
+        // flat obs makes both look like arbitrary vector indices); the conv gives that inductive
+        // bias. Feature order below is arbitrary (the width axis is NOT semantically ordered, a minor
+        // impurity vs. a true 1D conv -- the point is the height/floor axis), 8 features so width>=5.
+        public const int FloorGridFeatures = 8;
+
+        public void WriteFloorGrid(ObservationWriter writer)
+        {
+            int F = cfg.numFloors, E = cfg.numElevators;
+            for (int f = 0; f < F; f++)
+            {
+                int carsHere = 0, carsWant = 0;
+                for (int i = 0; i < E; i++)
+                {
+                    if (!cars[i].inService) continue;
+                    if (cars[i].Floor == f) carsHere++;
+                    if (cars[i].WantsFloor(f)) carsWant++;
+                }
+                float invE = E > 0 ? 1f / E : 0f;
+                // writer[channel, height=floor, width=feature]
+                writer[0, f, 0] = upQ[f].Count > 0 ? 1f : 0f;
+                writer[0, f, 1] = downQ[f].Count > 0 ? 1f : 0f;
+                writer[0, f, 2] = OldestWaitFrac(upQ[f]);
+                writer[0, f, 3] = OldestWaitFrac(downQ[f]);
+                writer[0, f, 4] = Mathf.Min(1f, upQ[f].Count / (float)cfg.maxQueue);
+                writer[0, f, 5] = Mathf.Min(1f, downQ[f].Count / (float)cfg.maxQueue);
+                writer[0, f, 6] = carsHere * invE;
+                writer[0, f, 7] = carsWant * invE;
+            }
+        }
+
         // ---------------------------------------------------------------- per-car observation (E6)
         // Same ObservationConfig blocks as WriteObservation, but "own car" blocks (carFloor/
         // carActive/carButtons/carMotion/carLoads) cover only carIndex's car instead of all E cars —
