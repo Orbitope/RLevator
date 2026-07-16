@@ -234,7 +234,7 @@ namespace ElevatorRL.Editor
         // first. CONFIRM obs input mapping + visual tensor layout via onnx.load before trusting.
         [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-conv, rung M, interfloor, seeds 1-5)")]
         static void RunE13SweepMInterfloorConv() => RunScaleLadderSweep("M-e13-interfloor-conv", 16, 5, 8,
-            "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv.onnx", obsSize: 254,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv_5m.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures);
 
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
@@ -270,6 +270,12 @@ namespace ElevatorRL.Editor
             const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
             int[] seeds = { 1, 2, 3, 4, 5 };
 
+            // Force a fresh import so a model file overwritten/copied on disk (common: cp a new
+            // run's ONNX over the eval path) is re-imported with its LATEST weights. Without this,
+            // AssetDatabase returns the stale cached import when the Editor hasn't auto-refreshed
+            // (auto-import is focus-gated), silently evaluating an OLD model — which produced a
+            // spurious PPO delivered=0 for the E13b conv model until caught.
+            AssetDatabase.ImportAsset(modelPath, ImportAssetOptions.ForceUpdate);
             var modelAsset = AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>(modelPath);
             if (modelAsset == null)
             {
