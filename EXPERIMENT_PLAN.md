@@ -959,13 +959,25 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - **Design caveat:** ML-Agents visual encoders are 2D, so the (F x 8) grid gets a 3x3 conv that also
     mixes adjacent (arbitrarily-ordered) features — a minor impurity vs. a true 1D floor conv; the
     floor-axis locality (the point) is captured.
-  - **Remaining before a result (needs the Unity Editor, currently the MCP-bridge bottleneck):**
-    (1) attach the component to the M build + rebuild headless; (2) train; (3) **eval needs a
-    visual-capable dispatcher** — the current `PpoDispatcher` feeds only `obs_0` (flat vector); a
-    conv model has a 2nd observation input (the grid), so eval must feed both (mirror
-    `AttentionDispatcher`'s multi-input handling). **OPEN RISK:** whether a match3 visual encoder
-    exports to ONNX and runs in Sentis inference is untested in this project — validate on a tiny run
-    before committing a full 5-10M-step budget.
+  - **DE-RISK COMPLETE (2026-07-15 ~21:20).** Attached the sensor, rebuilt headless, ran a 30k-step
+    smoke train — it (a) trained with no observation-spec error (the visual grid + match3 encoder is
+    accepted end-to-end) and (b) exported a conv ONNX cleanly, resolving the "does match3 export to
+    ONNX" open risk. `scripts/inspect_onnx.py` on the smoke model confirmed the input contract:
+    **`obs_0` = (batch, 1, 16, 8) NCHW visual grid, `obs_1` = (batch, 254) flat vector** (grid takes
+    obs_0 exactly as predicted from sensor-name sort). Fixed `ConvDispatcher` from its NHWC guess to
+    the confirmed NCHW `(1,1,F,8)` (`FillFloorGrid`'s h-major layout already matches). Ran the conv
+    eval sweep against the smoke model: **Sentis multi-input inference runs with no crash** (PPO
+    delivered=0 is just the untrained 30k-step policy — its training reward was still at the ~-41k
+    init level; the inference PATH is proven). Full conv eval pipeline is now end-to-end validated.
+  - **FULL RUN LAUNCHED: `elev-e13-m-interfloor-conv-01`** (2026-07-15 ~21:24,
+    `config/elevator_ppo_e13_interfloor_conv.yaml`, 5M, interfloor/Midday). Healthy at 40k
+    (reward -40,770, init scale). NOTE the CNN makes it ~2.6x slower than the flat baseline (~300
+    steps/s vs ~800), so 5M ≈ 4.7h. **Key comparison (does NOT even need the eval dispatcher):** conv
+    training reward vs the baseline interfloor curve at matched steps — baseline hit -29.3k @ 1M,
+    -24.9k @ 2M, converged ~-13.7k @ 10M; if conv tracks meaningfully ABOVE that, the floor-adjacency
+    inductive bias is helping. Then eval on Midday vs LOOK/ETA (menu `E13 Conv/Run Sweep ...PPO-conv`;
+    a good training reward that evals to ~0 would signal a residual ConvDispatcher obs-value bug to
+    debug, same class as the E5 bug).
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
