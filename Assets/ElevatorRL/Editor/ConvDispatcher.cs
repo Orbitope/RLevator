@@ -78,9 +78,10 @@ namespace ElevatorRL.Editor
                 if (!c.WantsFloor(c.Floor)) mask[baseIdx + 5] = 0f;
             }
 
-            // NHWC best-guess: (batch=1, height=floors, width=features, channels=1). NCHW alternative:
-            // new TensorShape(1, 1, _floors, _features). CONFIRM against the exported graph.
-            using var gridTensor = new Tensor<float>(new TensorShape(1, _floors, _features, 1), gridArr);
+            // CONFIRMED via scripts/inspect_onnx.py on the smoke model: obs_0 = (batch, 1, F, 8),
+            // i.e. NCHW (channels=1, height=floors, width=features). FillFloorGrid already writes
+            // h-major/w-minor (buf[f*8 + c]), which is exactly the flat order NCHW (1,1,F,8) expects.
+            using var gridTensor = new Tensor<float>(new TensorShape(1, 1, _floors, _features), gridArr);
             using var flatTensor = new Tensor<float>(new TensorShape(1, _obsSize), flatArr);
             using var maskTensor = new Tensor<float>(new TensorShape(1, E * 6), mask);
 
