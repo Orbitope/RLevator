@@ -1,0 +1,39 @@
+# config/elevator_ppo_e13_interfloor_conv.yaml — E13b SMOKE: floor-axis conv export check (30k steps, just to export an ONNX)
+#   mlagents-learn config/elevator_ppo_e13_interfloor_conv.yaml --run-id=elev-e13-m-interfloor-conv-NN
+#
+# Floor-axis spatial convolution (EXPERIMENT_PLAN.md E13b), the native analog of the 2024
+# Traffic-Pattern-Aware paper's Conv1d-over-floors. A FloorGridSensorComponent on the agent adds a
+# (1 x F x 8) single-channel grid observation ALONGSIDE the existing flat VectorSensor; vis_encode_type
+# match3 makes ML-Agents run its small CNN (min-res 5, OK for F>=5 x 8 feats) over that grid, giving
+# the policy floor-adjacency inductive bias the flat MLP lacks. Same bignet2 trunk (768x4) + same
+# baseline flat obs + same joint action as elev-e12-m-interfloor-01, so the conv pathway is the only
+# addition. Requires: FloorGridSensorComponent attached to ElevatorController in the M build (menu
+# Tools/Elevator RL/E13 Conv/Add Floor-Grid Sensor To Agent) + a fresh headless build.
+behaviors:
+  ElevatorController:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 768
+      num_layers: 4
+      normalize: true
+      vis_encode_type: match3
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 3.0e4
+    time_horizon: 256
+    summary_freq: 20000
+environment_parameters:
+  traffic_pattern: 3
+  use_day_cycle: 0
