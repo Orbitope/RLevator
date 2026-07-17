@@ -903,6 +903,64 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### 🚨 E15 — TRAFFIC REALISM: our environment, not RL, may be the story *(2026-07-16, from reading the paper's generator)*
+**Prompted by "review our traffic generation vs the paper's". This is the most consequential finding
+of the session and it reframes E2-E14.** Read `Passenger.py` (`PassengerGenerator`, `get_rate`,
+`get_from_to_floor`) + `elevator_controller.py:initialize_arrival_rate`.
+
+| | **paper** | **ours (rung M)** |
+|---|---|---|
+| load | **~1,009/hr** (UpPeak) … **1,612/hr** (Lunch) | **8,640/hr** (Midday @1.0) |
+| fleet | 4 cars x **capacity 20** = **80 slots** | 5 cars x **capacity 8** = **40 slots** |
+| **load per slot** | **16.2 /hr/slot** | **216.0 /hr/slot** → **13.3x more loaded** |
+| **abandonment** | **NONE** (no maxWait/balk anywhere in the repo — verified) | `maxWait=45s` ⇒ **33-70% abandon** |
+| traffic mix | **3 CONCURRENT generators** (`in coming` / `inter floor` / `out going`); Lunch = **23:43:33** | **ONE** generator; "Midday" = **0:100:0** |
+| rate profile | **48 x 15-min bins**, linearly interpolated, from a real 12h building day | **one flat lambda**, constant forever |
+| patterns | **time-slices of one continuous day** (UpPeak=bins 0:12, Lunch=18:30, InterFloor=12:18+30:36, DownPeak=36:48) | separate hardcoded lambda tables |
+| population | **1,200 (finite)**; iat = `300/(ar*pop/100)` | unbounded stream |
+| destinations | `random.sample(range(2, F+1), 2)`, lobby forced for in/out-going | uniform all-to-all (Midday) |
+
+**Why this likely explains the whole "RL never beats LOOK" narrative:**
+1. **Their system has slack; ours is drowning.** 13.3x more load per unit carrying capacity, plus a
+   45s deadline that sheds 33-70% of passengers *regardless of policy*. Under that much overload the
+   optimal strategy collapses toward "sweep continuously" — which is **exactly what LOOK does, by
+   construction**. We built a regime with almost nothing for RL to be smart about, then concluded RL
+   isn't smart.
+2. **No abandonment changes the OBJECTIVE, not just the difficulty.** Ours is dominated by
+   -8 x ~4,500 abandons of *largely unavoidable* losses, swamping the signal from good decisions.
+   Theirs: everyone is eventually served ⇒ the objective reduces to smooth **waiting-time
+   minimization** — a far more learnable signal, which is what their D3QN optimizes.
+3. **Their traffic mixes concurrently and matches the CIBSE templates** researched earlier (Lunch
+   23:43:33 vs CIBSE 45:45:10). Our "interfloor" is a degenerate **0:100:0 uniform all-to-all** — the
+   least structured, least *predictable* traffic possible. **There is no exploitable pattern in
+   uniform noise**, so a smarter policy has nothing to exploit.
+4. **Their rates vary across 15-min bins ⇒ `real_fr`/`real_tr` carry genuine predictive signal.**
+   **This corrects my own E13e reasoning:** with our constant lambda, the arrival-rate observation
+   would be a **near-constant input** — nearly worthless. **E13e is only meaningful AFTER E15.**
+5. Their `--d` arg additionally *amplifies* the matching generator during each peak, sharpening the
+   regime — another source of learnable structure we lack.
+
+**Status of the RL findings in light of this:** E13f stands as measured (LOOK beats the trained policy
+on its own reward; util 0.597 vs 0.754 ⇒ a real optimization failure). But E15 likely explains **why
+the ceiling is so low that it barely matters**: in a 13x-oversaturated, memoryless, uniform-noise
+environment, near-LOOK behaviour may simply *be* the optimum. **"RL can't beat LOOK" may be an
+artifact of our traffic model, not a fact about RL.**
+
+**PROPOSED FIX (E15a) — recalibrate the environment to the paper/CIBSE, then re-run the ladder:**
+1. **Load:** target ~1,000-1,600/hr at rung M (vs 8,640). Note E1 already measured M's calibrated
+   saturation base = **0.41**, and we train at **1.0** — E13c flagged this; E15 shows even 0.41 may be
+   too hot given capacity 8 vs their 20.
+2. **Concurrent mix:** 3 simultaneous generators (incoming/interfloor/outgoing) with a CIBSE-style
+   ratio, replacing the single-generator patterns.
+3. **Time-varying rates:** a binned/interpolated day profile (their 48x15min), which also makes the
+   patterns *slices of one day* — and makes E13e's rate signal meaningful.
+4. **Abandonment:** make `maxWait` an explicit experimental variable. **Run with/without** to isolate
+   how much of the RL-vs-LOOK gap it causes. (Do NOT just delete it — abandonment is realistic; the
+   issue is that at 13x overload it dominates everything.)
+5. Consider capacity 8 -> larger, or fewer floors per car, to restore slack.
+**Sequencing:** E15 should precede further E14 optimizer work — tuning the search on a degenerate
+environment optimizes the wrong thing.
+
 ### E14 — OPTIMIZATION, not representation *(the plan that follows from E13f; started 2026-07-16)*
 - **The finding that reorders everything: a good policy ALREADY EXISTS in our action space.**
   `ElevatorHeuristics.CollectiveLook` returns `int[E]` and the eval calls `b.ApplyAction(i, act[i])`
