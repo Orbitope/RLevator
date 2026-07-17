@@ -978,8 +978,8 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     inductive bias is helping. Then eval on Midday vs LOOK/ETA (menu `E13 Conv/Run Sweep ...PPO-conv`;
     a good training reward that evals to ~0 would signal a residual ConvDispatcher obs-value bug to
     debug, same class as the E5 bug).
-  - **RESULT (2026-07-16 ~01:11): floor-axis conv is the FIRST architecture to beat the flat MLP on
-    interfloor — a clear, durable sample-efficiency WIN.** Completed 5M steps. On the
+  - **RESULT (2026-07-16 ~01:11): conv beats the flat MLP decisively ON TRAINING REWARD — but see the
+    EVAL section below, which does NOT (yet) confirm this on delivered passengers.** Completed 5M steps. On the
     (observation/dispatcher-independent) training-reward axis, the conv led the flat MLP at *every*
     matched step by ~+3-4.5k reward, the whole run:
     | Step | flat MLP | conv | conv adv |
@@ -996,7 +996,38 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     ceiling, landing roughly where the flat MLP was at ~7-8M. This is the interfloor gap's first real
     dent from the architecture side (vs. the LSTM which made it worse). Model saved
     `results/elev-e13-m-interfloor-conv-01/`.
-  - **[EVAL PENDING — infra-blocked, NOT a result] delivered-passenger sweep not yet obtained.**
+  - **EVAL OBTAINED 2026-07-16 (stale-import fix worked) — AND IT COMPLICATES THE WIN. Read this
+    before citing the training-reward result above.** A fresh Editor imported the model correctly and
+    the conv eval ran properly (PPO delivers ~1,900-2,055, so the earlier `delivered=0` is confirmed
+    to have been the stale-import artifact and `ConvDispatcher` runs end-to-end). 5-seed Midday sweep
+    (`Runs/20260716-174643-...`):
+    | policy | delivered (mean) | abandoned | eval rwTotal | vs LOOK |
+    |---|---|---|---|---|
+    | LOOK | 2619.8 | 1298 | +5k..+7k | — |
+    | ETA | 2680.8 | 1239 | +5.7k..+8.3k | +2.3% |
+    | flat MLP **@10M** | 2241.8 | 1676 | -1.8k..-3.5k | -14.4% |
+    | **conv @5M** | **1978.4** | **1935** | **-7.9k..-10.7k** | **-24.5%** |
+    **The conv DELIVERS 11.7% FEWER than the flat MLP and its eval reward is far worse — the opposite
+    of the training-reward story.** Two candidate explanations, not yet separated:
+    1. **Unfair budget:** conv=5M vs flat=10M. The flat run's 5M checkpoint was PRUNED
+       (`keep_checkpoints: 5` kept only 8.5M-10M), so a matched flat@5M eval is not available without
+       retraining — hence the 10M conv extension below is the decisive test.
+    2. **A subtle ConvDispatcher grid mismatch:** conv trains to BETTER reward but evals to WORSE
+       reward/delivered. If the eval grid were subtly transposed/misordered vs. what the training
+       sensor writes, the model would still act (not degenerate → explains ~1,978 rather than 0) but
+       underperform its true ability — exactly this signature. Note values are shared via
+       `Building.FillFloorGrid` (identical by construction); the only possible drift is the flat
+       `float[]`→`TensorShape(1,1,F,8)` NCHW ordering vs. how ML-Agents' `ObservationWriter[ch,h,w]`
+       serializes at train time. Reasoned to match, NOT proven.
+    **Decisive test RUNNING: `elev-e13-m-interfloor-conv-01` resumed 5M→10M** (from step 5,000,192,
+    `config/elevator_ppo_e13_interfloor_conv_10m.yaml`, ~4.7h). If conv@10M delivers ≥ flat@10M's
+    2241.8 → explanation (1), conv win is real and confirmed on the headline metric. If conv@10M still
+    delivers ~1,980 despite a much better training reward → explanation (2), and the ConvDispatcher
+    grid ordering must be debugged (e.g. dump the training sensor's serialized obs and byte-compare
+    against `FillFloorGrid`'s buffer).
+    **Interim honest status: the conv's advantage is established ONLY on training reward; it does NOT
+    yet translate to delivered passengers, and may not.**
+  - *(superseded note)* **[EVAL PENDING — infra-blocked, NOT a result] delivered-passenger sweep not yet obtained.**
     First eval attempts showed PPO delivered=0, but this is a **stale-model-import artifact, not the
     conv policy**: `cp`-ing the new ONNX over the existing eval path left Unity serving the OLD cached
     import (auto-import is Editor-focus-gated), so the sweep evaluated stale/undertrained weights.
