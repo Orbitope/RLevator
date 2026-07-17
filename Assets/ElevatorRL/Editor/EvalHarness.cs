@@ -237,6 +237,17 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv_5m.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures);
 
+        // E13d: origin x destination 2D conv. obs_0 = (2,F,F) OD grid, obs_1 = flat 254.
+        [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-ODconv, rung M, interfloor, seeds 1-5)")]
+        static void RunE13dSweepMInterfloorODConv() => RunScaleLadderSweep("M-e13d-interfloor-odconv", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13d_interfloor_odconv.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, odConv: true);
+
+        [MenuItem("Tools/Elevator RL/E13 Conv/MATCHED-INTENSITY (1.0) Sweep — ODconv, rung M, interfloor")]
+        static void RunE13dSweepMInterfloorODConvI10() => RunScaleLadderSweep("M-e13d-interfloor-odconv-i10", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13d_interfloor_odconv.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, odConv: true, intensity: 1.0f);
+
         // ── E13c: MATCHED-INTENSITY eval (intensity 1.0 = the regime these policies were TRAINED in).
         // Every E2-E13 headline used intensity 0.5 while training ran at 1.0 (M fleet ~3.30x
         // oversaturated @1.0 vs ~1.65x @0.5) — so RL has always been scored in a regime it never
@@ -282,7 +293,7 @@ namespace ElevatorRL.Editor
             int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0,
             string obsConfigAssetPath = null, TrafficPattern pattern = TrafficPattern.UpPeak,
             bool recurrent = false, int memorySize = 0, bool conv = false, int gridFeatures = 0,
-            float intensity = SmokeIntensity, float totalSeconds = 3600f)
+            float intensity = SmokeIntensity, float totalSeconds = 3600f, bool odConv = false)
         {
             // NOTE (E13/2026-07-16): `intensity` defaults to SmokeIntensity (0.5) — the value every
             // E2-E13 headline number used — but TRAINING runs at TrafficConfig.intensity = 1.0. That
@@ -325,9 +336,10 @@ namespace ElevatorRL.Editor
             var ppoAttn = attention ? new AttentionDispatcher(modelAsset, globalObsSize, carEntitySize, maxNumObservables) : null;
             var ppoRec = recurrent ? new RecurrentPpoDispatcher(modelAsset, obsSize, memorySize) : null;   // E13a LSTM
             var ppoConv = conv ? new ConvDispatcher(modelAsset, obsSize, floors, gridFeatures) : null;     // E13b floor-conv
-            var ppoFlat = (multiAgent || attention || recurrent || conv) ? null : new PpoDispatcher(modelAsset, obsSize);
+            var ppoOD = odConv ? new ODConvDispatcher(modelAsset, obsSize, floors) : null;                  // E13d OD-conv
+            var ppoFlat = (multiAgent || attention || recurrent || conv || odConv) ? null : new PpoDispatcher(modelAsset, obsSize);
             Dispatcher ppoDispatch = multiAgent ? ppoMulti.Dispatch : attention ? ppoAttn.Dispatch
-                : recurrent ? ppoRec.Dispatch : conv ? ppoConv.Dispatch : ppoFlat.Dispatch;
+                : recurrent ? ppoRec.Dispatch : conv ? ppoConv.Dispatch : odConv ? ppoOD.Dispatch : ppoFlat.Dispatch;
 
             var rows = new List<string> {
                 "policy,seed,delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal"
@@ -364,6 +376,7 @@ namespace ElevatorRL.Editor
             ppoAttn?.Dispose();
             ppoRec?.Dispose();
             ppoConv?.Dispose();
+            ppoOD?.Dispose();
             ppoFlat?.Dispose();
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;

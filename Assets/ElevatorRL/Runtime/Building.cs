@@ -522,6 +522,74 @@ namespace ElevatorRL
             }
         }
 
+        // ---- Origin x Destination matrix (EXPERIMENT_PLAN.md E13d) ----
+        // A (2 x F x F) tensor: [channel = up/down hall queue] x [height = ORIGIN floor] x
+        // [width = DESTINATION floor], value = waiting riders at that origin bound for that dest
+        // (normalized by maxQueue, same as the E5 omniscient block).
+        //
+        // Why this and not the E13b (1 x F x 8) floor grid:
+        //   1. BOTH axes are ordered floors, so a 3x3 conv kernel is genuinely meaningful — it sees
+        //      "flow from floors near i to floors near j". The E13b grid's width axis was the 8
+        //      arbitrary features, which have no spatial ordering: convolving across them imposed a
+        //      FALSE inductive bias and wasted capacity.
+        //   2. It carries information the flat obs does NOT have (destinations), so it can move the
+        //      ASYMPTOTE. E13b only re-presented info already in the flat 254 obs, which is exactly
+        //      why its advantage eroded to noise by ~7M steps (faster learning, same endpoint).
+        //   3. F x F (16x16 on M) clears the RESNET encoder's min-resolution of 15, unlocking a much
+        //      stronger encoder than match3 (the 8-wide E13b grid was capped at match3, min-res 5).
+        //   4. It is DCS-realistic: destination-control systems (Schindler/Otis/KONE) genuinely know
+        //      HALL destinations before boarding — see the ObservationConfig.omniscientDestinations
+        //      tooltip. This is the deployable half of E5's omniscient block, given the structure that
+        //      E5 destroyed by flattening it into 592 MLP inputs.
+        // Note each channel is triangular (up-queues only ever target dest > origin, down-queues
+        // dest < origin); the empty half is harmless and the conv can learn it.
+        public const int FloorODChannels = 2;
+
+        // Flat layout matches ObservationWriter's NCHW index (TensorExtensions.Index(n,c,h,w) =
+        // c*H*W + h*W + w for n=0), so the eval dispatcher can feed this buffer straight into a
+        // (1, 2, F, F) tensor. Single source of truth for train + eval, like FillFloorGrid.
+        public void FillFloorOD(float[] buf)
+        {
+            int F = cfg.numFloors;
+            System.Array.Clear(buf, 0, FloorODChannels * F * F);
+            float norm = cfg.maxQueue > 0 ? cfg.maxQueue : 1;
+            for (int origin = 0; origin < F; origin++)
+            {
+                AccumulateOD(buf, upQ[origin], 0, origin, F, norm);
+                AccumulateOD(buf, downQ[origin], 1, origin, F, norm);
+            }
+        }
+
+        static void AccumulateOD(float[] buf, System.Collections.Generic.List<Passenger> q,
+            int channel, int origin, int F, float norm)
+        {
+            if (q == null) return;
+            int rowBase = channel * F * F + origin * F;
+            for (int i = 0; i < q.Count; i++)
+            {
+                int d = q[i].dest;
+                if (d >= 0 && d < F) buf[rowBase + d] += 1f;
+            }
+            for (int d = 0; d < F; d++)
+            {
+                int idx = rowBase + d;
+                if (buf[idx] > 0f) buf[idx] = Mathf.Min(1f, buf[idx] / norm);
+            }
+        }
+
+        float[] _odScratch;
+        public void WriteFloorOD(ObservationWriter writer)
+        {
+            int F = cfg.numFloors;
+            int need = FloorODChannels * F * F;
+            if (_odScratch == null || _odScratch.Length != need) _odScratch = new float[need];
+            FillFloorOD(_odScratch);
+            for (int c = 0; c < FloorODChannels; c++)
+                for (int h = 0; h < F; h++)
+                    for (int w = 0; w < F; w++)
+                        writer[c, h, w] = _odScratch[c * F * F + h * F + w];
+        }
+
         float[] _gridScratch;
         public void WriteFloorGrid(ObservationWriter writer)
         {

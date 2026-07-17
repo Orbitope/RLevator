@@ -1,0 +1,47 @@
+# config/elevator_ppo_e13d_interfloor_odconv.yaml — E13d: origin x destination 2D conv, interfloor
+#   mlagents-learn config/elevator_ppo_e13d_interfloor_odconv.yaml --run-id=elev-e13d-m-interfloor-odconv-NN
+#
+# The first arm that gives the CNN a grid worth convolving AND information the flat obs lacks:
+# a (2 x F x F) hall origin-destination matrix ([up/down] x [origin floor] x [dest floor]) via
+# FloorODSensorComponent, alongside the baseline flat 254 obs. Both grid axes are ordered floors, so a
+# 3x3 kernel means something ("flow from floors near i to floors near j") -- unlike E13b's (1 x F x 8)
+# grid whose width axis was arbitrarily-ordered features (a FALSE inductive bias, and capped at the
+# weak match3 encoder).
+#
+# vis_encode_type: resnet -- 16x16 on rung M clears resnet's min-resolution of 15. REQUIRES that the
+# E13b FloorGridSensorComponent be REMOVED (vis_encode_type applies to ALL visual obs; an 8-wide grid
+# would break resnet). Setup: Point Agent At Baseline Obs -> E13 Conv/Remove Floor-Grid Sensor ->
+# E13 Conv/Add Floor-OD Sensor -> rebuild headless.
+#
+# Hypothesis: E13b showed the conv only SPEEDS UP learning (advantage eroded to noise by ~7M) because
+# it merely restructured info already in the flat obs -- it could not move the asymptote. Destinations
+# are NEW information, so this arm can. Also DCS-realistic (destination-control systems know hall
+# destinations pre-boarding), so it is a deployable controller, not just a ceiling probe.
+behaviors:
+  ElevatorController:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 2048
+      buffer_size: 20480
+      learning_rate: 3.0e-4
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      hidden_units: 768
+      num_layers: 4
+      normalize: true
+      vis_encode_type: resnet
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 5.0e6
+    time_horizon: 256
+    summary_freq: 20000
+environment_parameters:
+  traffic_pattern: 3
+  use_day_cycle: 0

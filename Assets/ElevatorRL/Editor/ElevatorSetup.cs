@@ -118,6 +118,38 @@ namespace ElevatorRL.Editor
             Debug.Log("[ElevatorRL] Added FloorGridSensorComponent (floor-axis conv pathway). Rebuild the headless trainer.");
         }
 
+        // E13d: the origin x destination (2 x F x F) conv pathway. Both axes are ordered floors, so
+        // the conv kernel is meaningful, and it carries destinations (info the flat obs lacks) so it
+        // can move the asymptote — unlike E13b's (1 x F x 8) grid. Remove the E13b floor-grid sensor
+        // first: vis_encode_type applies to ALL visual obs and an 8-wide grid breaks resnet.
+        [MenuItem("Tools/Elevator RL/E13 Conv/Add Floor-OD Sensor To Agent")]
+        static void AddFloorODSensor()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene — run Setup Scene first."); return; }
+            if (go.GetComponent<FloorGridSensorComponent>() != null)
+                Debug.LogWarning("[ElevatorRL] FloorGridSensorComponent (E13b, 8-wide) is still attached — " +
+                    "remove it before training with vis_encode_type: resnet (min-res 15).");
+            if (go.GetComponent<FloorODSensorComponent>() != null) { Debug.Log("[ElevatorRL] FloorODSensorComponent already present."); return; }
+            go.AddComponent<FloorODSensorComponent>();
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log("[ElevatorRL] Added FloorODSensorComponent (2 x F x F origin×destination conv). Rebuild the headless trainer.");
+        }
+
+        [MenuItem("Tools/Elevator RL/E13 Conv/Remove Floor-OD Sensor From Agent")]
+        static void RemoveFloorODSensor()
+        {
+            var go = GameObject.Find("ElevatorController");
+            if (go == null) { Debug.LogError("[ElevatorRL] No 'ElevatorController' GameObject in the open scene."); return; }
+            var comp = go.GetComponent<FloorODSensorComponent>();
+            if (comp == null) { Debug.Log("[ElevatorRL] No FloorODSensorComponent to remove."); return; }
+            Object.DestroyImmediate(comp);
+            EditorUtility.SetDirty(go);
+            EditorSceneManager.MarkSceneDirty(go.scene);
+            Debug.Log("[ElevatorRL] Removed FloorODSensorComponent. Rebuild the headless trainer.");
+        }
+
         [MenuItem("Tools/Elevator RL/E13 Conv/Remove Floor-Grid Sensor From Agent")]
         static void RemoveFloorGridSensor()
         {

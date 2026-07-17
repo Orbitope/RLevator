@@ -1155,6 +1155,47 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     10M (-13,652) — conv was still climbing at 5M; (2) if the win holds, conv becomes the interfloor
     (and likely general) recipe → re-run the other E12 patterns (Lunch/DownPeak/DayCycle) and rung L
     on the conv architecture; (3) the reused `RecurrentPpoDispatcher`/LSTM path stays shelved.
+- **E13d — origin×destination 2D conv [CODE BUILT 2026-07-16, not yet trained]. The first arm that
+  can plausibly move the ASYMPTOTE rather than the learning curve.**
+  - **Why E13b plateaued (the diagnosis this arm is built on):** the (1 x F x 8) floor grid contained
+    **no information the flat 254 obs lacked** — it only re-presented known features in a better
+    structure. Better structure ⇒ faster early learning; no new information ⇒ same asymptote. That is
+    exactly the measured behaviour (advantage +4,466 @2.38M → +172 @7M).
+  - **Two things were also wrong with E13b's grid, found while answering "why not 2D?" (user, 2026-07-16):**
+    1. **It was ALREADY 2D** — ML-Agents' match3 encoder is `Conv2d(1→35,[3,3])` then
+       `Conv2d(35→144,[3,3])`. The plan previously mis-described it as approximating the paper's 1D
+       conv. **Corrected.**
+    2. **The 2D-ness was a LIABILITY:** the width axis was the 8 features
+       {hallUp,hallDown,upAge,downAge,upQlen,downQlen,carsHere,carsWantHere}, which have **no spatial
+       ordering** — a 3x3 kernel sliding across them imposes a FALSE inductive bias and wastes
+       capacity. It also capped the encoder: an 8-wide grid only clears `MATCH3` (min-res 5), so
+       `RESNET` (15) / `SIMPLE` (20) / `NATURE_CNN` (36) were all unreachable.
+  - **The fix — `(2 x F x F)` hall origin×destination matrix** ([up/down] x [origin floor] x
+    [dest floor], normalized by maxQueue): `Building.FillFloorOD`/`WriteFloorOD` +
+    `FloorODSensor`/`FloorODSensorComponent` + `ODConvDispatcher` + menu items
+    (`E13 Conv/Add|Remove Floor-OD Sensor`) + `config/elevator_ppo_e13d_interfloor_odconv.yaml`.
+    Four reasons it should beat E13b:
+    1. **Both axes are ordered floors** → a 3x3 kernel is genuinely meaningful ("flow from floors near
+       i to floors near j"). Real 2D locality on both dims.
+    2. **It carries NEW information** (destinations) that the flat obs does not have → can move the
+       asymptote, not just the learning speed.
+    3. **16x16 clears RESNET's min-res 15** → a much stronger encoder than match3 (config uses
+       `vis_encode_type: resnet`). At rung L, 30x30 would also clear `SIMPLE`.
+    4. **DCS-realistic** — destination-control systems (Schindler/Otis/KONE) genuinely know HALL
+       destinations pre-boarding (see the 2026-07-15 literature research + the corrected
+       `omniscientDestinations` tooltip). This is a deployable controller, not a ceiling probe.
+  - **This is the E5×E13b synthesis neither arm ran:** E5 had the destination INFORMATION but fed it as
+    592 flat floats into an MLP, destroying its 2D structure; E13b had the conv STRUCTURE but no new
+    information. Combining them is the untested cell.
+  - **Layout is PROVEN, not guessed:** `FillFloorOD` writes `buf[c*F*F + origin*F + dest]`, which is
+    exactly `ObservationWriter`'s NCHW `Index(n,c,h,w) = c*H*W + h*W + w` (verified identical for all
+    512 cells), so `ODConvDispatcher` feeds the same buffer straight into a `(1,2,F,F)` tensor.
+    obs_0 = OD grid, obs_1 = flat 254 (sensor name-sort: "FloorOD" < "VectorSensor_size254").
+  - **SETUP (needs an Editor session; MUST remove the E13b grid first — `vis_encode_type` applies to
+    ALL visual obs and an 8-wide grid breaks resnet):** Point Agent At Baseline Obs →
+    `E13 Conv/Remove Floor-Grid Sensor` → `E13 Conv/Add Floor-OD Sensor` → Build Headless Trainer →
+    smoke-train + `scripts/inspect_onnx.py` to confirm obs_0 is (batch,2,16,16) → full 5M run →
+    eval (`E13 Conv/Run Sweep ...PPO-ODconv`, plus the MATCHED-INTENSITY 1.0 variant per E13c).
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
