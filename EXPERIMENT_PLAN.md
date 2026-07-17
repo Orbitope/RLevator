@@ -1061,7 +1061,25 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     inductive bias is helping. Then eval on Midday vs LOOK/ETA (menu `E13 Conv/Run Sweep ...PPO-conv`;
     a good training reward that evals to ~0 would signal a residual ConvDispatcher obs-value bug to
     debug, same class as the E5 bug).
-  - **RESULT (2026-07-16 ~01:11): conv beats the flat MLP decisively ON TRAINING REWARD — but see the
+  - **⚠️ UPDATED CONCLUSION (2026-07-16 ~20:15, from the 5M→10M extension): the conv's advantage is an
+    EARLY SAMPLE-EFFICIENCY GAIN THAT ERODES — not a better policy.** Tracking the gap past 5M shows
+    the flat MLP catching up to ~noise:
+    | step | conv | flat | conv adv |
+    |---|---|---|---|
+    | 2.38M | -19,707 | -24,173 | **+4,466** |
+    | 3.9M | -16,360 | -19,362 | +3,002 |
+    | 5M | ~-15,100 | -17,277 | +2,200 |
+    | 6M | -15,750 | -16,591 | **+841** |
+    | 7M | -15,231 | -15,403 | **+172** |
+    | 7.86M | -14,361 | -15,078 | +717 |
+    By 6-7M the gap (+172..+841) is inside the noise band (std ~400-700). **The floor-adjacency
+    inductive bias speeds up early learning but does not raise the asymptote** — the flat MLP reaches
+    the same place given enough samples (flat converged -13,652 @10M). This *also explains the eval*
+    with no further hypothesis needed: conv@5M delivered fewer than flat@10M simply because flat@10M
+    sits further along the SAME curve. Retracts the earlier "first architecture to beat the flat MLP"
+    framing: it is "first architecture to learn *faster*", which is a much weaker claim (and of little
+    practical value here, since we can afford 10M steps).
+  - *(superseded framing)* **RESULT (2026-07-16 ~01:11): conv beats the flat MLP decisively ON TRAINING REWARD — but see the
     EVAL section below, which does NOT (yet) confirm this on delivered passengers.** Completed 5M steps. On the
     (observation/dispatcher-independent) training-reward axis, the conv led the flat MLP at *every*
     matched step by ~+3-4.5k reward, the whole run:
