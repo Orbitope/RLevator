@@ -65,6 +65,46 @@ cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/RewardConfig.asset"      "$SNAP_DIR/c
 cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/ObservationConfig.asset" "$SNAP_DIR/configs/"
 cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/TrafficConfig.asset"     "$SNAP_DIR/configs/"
 
+# --- Wired-config audit (guards the silent-misconfiguration bug class that has bitten 3x:
+# E5's obs-config eval bug, E13b's stale model import, and the grid sensor still attached when
+# launching E14a). The fixed-path copies above record what the assets CONTAIN, but not which assets
+# the scene is actually WIRED to — those can differ (they did for every E5 run: the snapshot held
+# the baseline ObservationConfig while the scene used ObservationConfig_FullState/etc.). This block
+# records the truth: the guid the scene references, resolved to an asset path, plus which optional
+# sensor components are attached. Also copies the ACTUAL wired obs config, not just the default one.
+SCENE="$PROJECT_ROOT/Assets/Scenes/Training.unity"
+{
+  echo "# What Assets/Scenes/Training.unity ACTUALLY references at launch time (guid -> asset)."
+  for key in buildingConfig rewardConfig observationConfig trafficConfig; do
+    guid=$(grep -m1 "  $key:" "$SCENE" | grep -oE 'guid: [0-9a-f]+' | awk '{print $2}')
+    if [ -n "$guid" ]; then
+      meta=$(grep -rl "guid: $guid" "$PROJECT_ROOT/Assets" --include="*.meta" 2>/dev/null | head -1)
+      asset="${meta%.meta}"
+      echo "$key: guid=$guid asset=${asset#$PROJECT_ROOT/}"
+      if [ "$key" = "observationConfig" ] && [ -f "$asset" ]; then
+        cp "$asset" "$SNAP_DIR/configs/ObservationConfig.WIRED.asset"
+      fi
+    fi
+  done
+  echo "# Optional sensor components attached to the scene (instances by script guid):"
+  for s in FloorGridSensorComponent FloorODSensorComponent; do
+    g=$(grep -m1 '^guid:' "$PROJECT_ROOT/Assets/ElevatorRL/Runtime/$s.cs.meta" 2>/dev/null | awk '{print $2}')
+    [ -n "$g" ] && echo "$s: $(grep -c "$g" "$SCENE") instance(s)"
+  done
+} > "$SNAP_DIR/configs/wired_configs.txt"
+echo "[start_training] Wired-config audit:"
+sed 's/^/[start_training]   /' "$SNAP_DIR/configs/wired_configs.txt" | grep -v '^#' || true
+
+# --- Stale-build guard: the headless build BAKES the scene (sensors, obs config, brain params).
+# If the scene was edited after the build, the run silently uses the OLD configuration.
+if [ -n "$ENV_BUILD" ]; then
+  BUILD_BIN=$(ls "$PROJECT_ROOT/$ENV_BUILD"/Contents/MacOS/* 2>/dev/null | head -1)
+  if [ -n "$BUILD_BIN" ] && [ "$SCENE" -nt "$BUILD_BIN" ]; then
+    echo "[start_training] WARNING: Training.unity is NEWER than the headless build — the build is" \
+         "likely STALE and bakes an older scene. Rebuild before trusting this run." >&2
+  fi
+fi
+
 echo "[start_training] Reproducibility snapshot written to $SNAP_DIR"
 cd "$PROJECT_ROOT"
 
