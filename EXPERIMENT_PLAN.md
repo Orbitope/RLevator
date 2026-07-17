@@ -903,6 +903,57 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### E14 — OPTIMIZATION, not representation *(the plan that follows from E13f; started 2026-07-16)*
+- **The finding that reorders everything: a good policy ALREADY EXISTS in our action space.**
+  `ElevatorHeuristics.CollectiveLook` returns `int[E]` and the eval calls `b.ApplyAction(i, act[i])`
+  — **the exact same call `ElevatorControllerAgent` uses** (line 223). So LOOK *is* a policy inside our
+  AS0 action space + observation, and it scores **-33,004** where PPO reaches **-45,746**.
+  **Representability is proven, not hypothesised.** ⇒ Do NOT redesign the action space to make good
+  policies *expressible* (they already are). Change what makes them **reachable**. E14 is therefore
+  about SEARCH, not representation.
+- **Why our formulation is much harder than the 2024 paper's (from reading their source):**
+  | | paper | ours |
+  |---|---|---|
+  | when the policy acts | **event-driven**: only on arrive-floor / boarded / get-off, AND only if `available_actions.sum() > 1` (a real choice exists) | **every 0.5s tick**, unconditionally |
+  | who decides | **ONE car** (`q[car_id*5 : car_id*5+5]`) | **all 5 cars jointly** |
+  | action space per decision | **5** | 5 branches x 6 (joint credit assignment) |
+  | formulation | **SMDP**, time-discounted cost between decisions (`get_discounted_cost`, beta) | fixed-tick MDP, linear per-tick penalties |
+  | algorithm | **D3QN** — off-policy, replay, **PER** (`SumTree.py`) | **PPO** — on-policy, no replay |
+  Note MultiDiscrete *factorises* (5 independent 6-way heads), so the raw 6^5 combinatorics is NOT the
+  issue — the issue is **credit assignment** (one global reward for 5 simultaneous choices) and
+  **decision density** (2048 joint decisions/episode vs. their sparse event-driven ones).
+  **Our result does NOT invalidate the paper** — we built a different, harder problem.
+- **Also: this is NOT the failed E6-A.** E6-A gave per-car agents only LOCAL state, so coordination was
+  impossible. The paper uses **global state + one car decides at a time + shared net** — centralized
+  information, decentralized action. **We have never tried that cell.**
+- **ARMS, ordered by value ÷ cost:**
+  | arm | tests | cost | status |
+  |---|---|---|---|
+  | **E14a SAC** | is it the ALGORITHM? off-policy + replay + entropy max ≈ the paper's D3QN+PER; directly targets "under-explores, leaves 21% of fleet idle" | **config only** | **RUNNING** |
+  | **E14b BC/GAIL warm-start from LOOK** | hands the policy the solution it can't find — the most on-the-nose fix for a search failure | demo recorder + config | queued |
+  | **E14c AS1 target-floor (E9)** | decision SPARSITY + semantic actions; **already implemented** (`ActionSpaceMode.TargetFloor` + `TargetFloorControl`) — just rebake + rebuild | rebuild only | queued |
+  | **E14d event-driven decisions** | decision DENSITY: only act when a car has a real choice (their `available_actions.sum() > 1`) | moderate | queued |
+  | **E14e per-car sequential + global state** | the paper's true design; the untried cell | larger | queued |
+- **E10 (reward shaping) is DE-PRIORITIZED:** the reward already ranks LOOK (-33,004) far above the
+  trained policy (-45,746). Reshaping a reward that already prefers the right behaviour cannot fix a
+  failure to *search*.
+- **E14a — SAC [RUNNING, launched 2026-07-16 21:31] `elev-e14a-m-interfloor-sac-01`**
+  (`config/elevator_ppo_e14a_interfloor_sac.yaml`, 2M steps, ~276 steps/s ⇒ ~2h).
+  - **Controlled:** identical to the E12 interfloor PPO baseline except the ALGORITHM — same baseline
+    obs (254), same 768x4 net, same gamma 0.995, same Midday pattern. **Removed the E13b
+    `FloorGridSensorComponent` and rebuilt first** (it was still attached; training SAC against it
+    would have silently tested SAC+conv — verified removed by script GUID, scene saved 21:28, build
+    21:30).
+  - **SAC hypers are NOT PPO's** — verified field-by-field against `SACSettings`
+    (`mlagents/trainers/sac/optimizer_torch.py`) and parsed through ml-agents' own `RunOptions`.
+    Two traps avoided: (1) `buffer_size` is the **replay** buffer — PPO's 20480 rollout value would be
+    uselessly small ⇒ 200,000; (2) `steps_per_update` default **1** = one gradient update per env step,
+    which with 20 envs crawls ⇒ **20** (≈ num agents; ~100k updates over 2M vs PPO's ~2.9k).
+    `init_entcoef: 1.0` (high entropy for discrete) directly attacks the under-exploration.
+  - **Read:** compare at MATCHED STEPS to PPO (-29,263 @1M, -24,884 @2M). SAC's claim is SAMPLE
+    efficiency, so a real win should be visible by 1-2M. Then eval and compare delivered/util against
+    LOOK (3302 delivered / util 0.754 @1.0). **The decisive question: does util rise off 0.597?**
+
 ### 🎯 E13f — ROOT CAUSE FOUND (2026-07-16): RL is FAILING TO OPTIMIZE ITS OWN REWARD, not chasing a bad one
 **The decisive test cost nothing — the matched-intensity CSV already had `rwTotal` for all policies at
 intensity 1.0 (the TRAINING regime, RL's own objective):**

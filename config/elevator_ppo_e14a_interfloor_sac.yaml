@@ -1,0 +1,51 @@
+# config/elevator_ppo_e14a_interfloor_sac.yaml — E14a: SAC (off-policy) vs PPO, interfloor, rung M
+#   mlagents-learn config/elevator_ppo_e14a_interfloor_sac.yaml --run-id=elev-e14a-m-interfloor-sac-NN
+#
+# WHY: E13f showed LOOK beats the trained PPO policy by ~28% on PPO'S OWN REWARD, in PPO's own
+# training regime (LOOK -33,004 vs PPO -45,746 @ intensity 1.0), while PPO leaves ~21% of fleet
+# capacity idle (util 0.597 vs 0.754). And LOOK emits the SAME int[] action encoding through the SAME
+# Building.ApplyAction the agent uses — so a ~-33k policy DEMONSTRABLY EXISTS inside our AS0 action
+# space and observation. PPO simply cannot find it. That is a SEARCH/OPTIMIZATION failure, not a
+# representation or reward-design failure.
+#
+# SAC is the cheapest structural fix and the biggest algorithmic difference from the 2024 paper
+# (which uses D3QN: off-policy, replay buffer, PER). SAC is off-policy with a replay buffer and
+# entropy maximization — directly targeting the "under-explores, leaves cars idle" failure mode.
+#
+# CONTROLLED COMPARISON — everything matches the E12 interfloor PPO baseline except the ALGORITHM:
+#   same baseline obs (254, no conv sensor), same 768x4 net, same gamma 0.995, same interfloor
+#   (Midday) pattern via env params. Compare at MATCHED STEPS to PPO: -29,263 @1M, -24,884 @2M.
+#
+# SAC hyperparameters are NOT PPO's — verified against SACSettings in
+# mlagents/trainers/sac/optimizer_torch.py. Two traps avoided:
+#   * buffer_size is the REPLAY buffer here (PPO's 20480 rollout value would be uselessly small).
+#   * steps_per_update default 1 = one gradient update per env step; with 20 envs that crawls.
+#     Docs recommend ~= number of agents => 20 (gives ~100k updates over 2M steps, vs PPO's ~2.9k).
+behaviors:
+  ElevatorController:
+    trainer_type: sac
+    hyperparameters:
+      batch_size: 256           # discrete SAC typical 32-512; 256 for stability with a 768x4 trunk
+      buffer_size: 200000       # REPLAY buffer (SAC typical 50k-1M); ~100 episodes of history
+      buffer_init_steps: 10000  # random-action prefill before learning starts
+      learning_rate: 3.0e-4
+      learning_rate_schedule: constant   # SAC default/recommended (PPO used linear)
+      tau: 0.005                # target-network soft update
+      steps_per_update: 20      # == num agents (20 envs); balances sample-efficiency vs wall-clock
+      save_replay_buffer: false
+      init_entcoef: 1.0         # HIGH entropy for discrete — directly attacks the under-exploration
+    network_settings:
+      hidden_units: 768         # identical to the PPO baseline so ALGORITHM is the only variable
+      num_layers: 4
+      normalize: true
+    reward_signals:
+      extrinsic:
+        gamma: 0.995
+        strength: 1.0
+    keep_checkpoints: 5
+    max_steps: 2.0e6            # probe: SAC's claim is SAMPLE efficiency, so compare @1M/@2M vs PPO
+    time_horizon: 256
+    summary_freq: 20000
+environment_parameters:
+  traffic_pattern: 3            # Midday = pure interfloor (same as the E12/E13 baseline)
+  use_day_cycle: 0
