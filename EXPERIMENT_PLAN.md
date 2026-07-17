@@ -903,6 +903,58 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### 🎯 E13f — ROOT CAUSE FOUND (2026-07-16): RL is FAILING TO OPTIMIZE ITS OWN REWARD, not chasing a bad one
+**The decisive test cost nothing — the matched-intensity CSV already had `rwTotal` for all policies at
+intensity 1.0 (the TRAINING regime, RL's own objective):**
+| policy | rwTotal | delivered | abandoned | **utilization** |
+|---|---|---|---|---|
+| LOOK | **-33,004** | 3302 | 4500 | **0.754** |
+| ETA | -33,254 | 3287 | 4517 | 0.753 |
+| **PPO (conv)** | **-45,746** | 2687 | 5111 | **0.597** |
+
+**LOOK beats the trained policy by ~12,700 reward (28%) on the very objective PPO is trained to
+maximize — in PPO's own training regime.**
+
+**This cleanly separates the two candidate explanations:**
+- If the reward were **misspecified**, PPO would score *higher* reward than LOOK while delivering
+  fewer passengers (successfully optimizing the wrong thing). **It does not.**
+- PPO scores **worse reward AND fewer deliveries AND more abandonments.** It is beaten on its own
+  metric by a hand-written heuristic. ⇒ **The reward function is fine. The RL is failing to optimize
+  it.** This is an OPTIMIZATION/learning failure, not a reward-design failure.
+
+**Smoking gun — utilization 0.597 (PPO) vs 0.754 (LOOK):** the policy leaves **~21% of fleet capacity
+idle**. It is simply not moving cars enough. Note PPO's waitMean is *better* (21.7s vs 22.8s) — the
+classic signature of a policy that serves a smaller subset well while letting the rest time out
+(abandoning 5111 vs 4500). It has settled into a low-activity local optimum.
+
+**This reframes the whole project.** Every architecture/observation avenue is now eliminated as the
+cause:
+| hypothesis | verdict |
+|---|---|
+| temporal memory (E13a LSTM) | ❌ tracked *behind* baseline |
+| spatial structure (E13b conv) | ❌ faster learning, same asymptote |
+| eval dispatcher bug | ❌ ruled out via serialization index math |
+| more information (E5 omniscient) | ❌ no gain |
+| train/eval regime mismatch (E13c) | ❌ refuted — loses at 1.0 too |
+| **reward misspecification** | ❌ **refuted here — LOOK wins on PPO's own reward** |
+⇒ **The remaining suspects are the ACTION SPACE and the CREDIT ASSIGNMENT / exploration**, i.e. can
+this policy *represent and reach* LOOK-like behavior at all?
+
+**HIGH-VALUE NEXT TESTS (cheap, in order):**
+1. **Representability / imitation check (decisive, cheap):** E9's `TargetFloorLookDispatch` already
+   proves LOOK-like targets are expressible through our action interface. Run LOOK's actions through
+   the *agent's* AS0 primitive action space and confirm it reproduces LOOK's reward. If LOOK-through-
+   our-action-space scores ~-33k, the action space CAN represent good behavior ⇒ pure exploration/
+   optimization failure ⇒ the fix is **BC/GAIL warm-start from LOOK demonstrations** (already parked in
+   E8!) or a better action space (E9 semi-MDP target-floor).
+2. **E9 (target-floor semi-MDP action space)** — both baselines natively reason at target-floor
+   granularity; forcing RL through per-tick primitives may be the barrier. This is now the most
+   promising untried arm.
+3. **E10 reward shaping is DE-PRIORITIZED** — the reward demonstrably favours LOOK-like behaviour
+   already; reshaping it does not address an optimization failure.
+4. E13e (arrival rates) — still worth running as the paper's missing signal, but the gap is now
+   unlikely to be an observation problem, so lower priority than (1)/(2).
+
 ### ✅ E13c — TESTED 2026-07-16: the regime mismatch is REAL but does NOT explain the RL-vs-LOOK gap
 **Matched-intensity result (rung M, Midday, 5 seeds, conv@5M, `Runs/20260716-211126-...`):**
 | policy | delivered @**1.0** (TRAINING regime) | delivered @0.5 (eval regime) |
