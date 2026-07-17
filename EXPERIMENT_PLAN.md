@@ -903,6 +903,36 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### ✅ E13c — TESTED 2026-07-16: the regime mismatch is REAL but does NOT explain the RL-vs-LOOK gap
+**Matched-intensity result (rung M, Midday, 5 seeds, conv@5M, `Runs/20260716-211126-...`):**
+| policy | delivered @**1.0** (TRAINING regime) | delivered @0.5 (eval regime) |
+|---|---|---|
+| LOOK | **3302.2** | 2619.8 |
+| ETA | 3287.4 | 2680.8 |
+| **PPO (conv)** | **2687.2** | 1978.4 |
+| **PPO vs LOOK** | **-18.6%** | -24.5% |
+
+**HYPOTHESIS REFUTED. RL loses to LOOK by ~19% *in the exact regime it was trained on*.** The
+train/eval mismatch is real (documented below, and worth fixing on its own methodological merit) but
+it is **NOT** why RL underperforms the heuristics. Evaluating in the training regime narrows the gap
+somewhat (-24.5% → -18.6%) yet leaves it large and decisive. So the project's central narrative
+("RL only matches/loses to LOOK") is **not** an artifact of the evaluation regime — it is a real
+result about the policy.
+
+**Also corrects the mechanism claim below:** LOOK delivers MORE at 1.0 (3302) than at 0.5 (2620), so
+fleet throughput is ~**0.92/s**, not the ~0.73/s I estimated, and deliveries **do rise with load**.
+My "deliveries are throughput-capped, so reward is ~78% penalty-driven" reasoning was therefore
+**wrong in its key premise** — the cap is soft and load-dependent. The regime-mismatch section below
+is retained for the (still valid) train/eval-hygiene finding and the E1-calibration point, but its
+*mechanism* argument should be disregarded.
+
+**What this redirects us to:** the RL policy is genuinely worse at dispatch than collective control on
+interfloor traffic, in its own training regime, at every architecture tried (flat MLP, LSTM, conv).
+That points at the reward/action/credit-assignment formulation rather than observation or regime —
+e.g. the joint MultiDiscrete action space, or a reward whose optima do not coincide with delivery
+throughput. E13e (arrival rates) is still worth running as the paper's missing input signal, but the
+gap is now unlikely to be an observation problem.
+
 ### ⚠️ E13c — TRAIN/EVAL REGIME MISMATCH: a project-wide methodological confound *(discovered 2026-07-16)*
 - **Every RL result in this project (E2-E13) trains in one regime and is scored in a different one.**
   Found while investigating why E13b's conv has better training reward but worse eval delivered.
