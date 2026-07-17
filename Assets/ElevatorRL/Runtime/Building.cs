@@ -381,9 +381,34 @@ namespace ElevatorRL
             if (obs.queueLengths) s += 2 * F;
             if (obs.timeOfDay) s += 2;
             if (obs.pattern) s += 5;
+            if (obs.arrivalRates) s += 2 * F;
             if (obs.omniscientDestinations) s += 2 * F * F + E * F;
             return s;
         }
+
+        // EXPERIMENT_PLAN.md E13e. Per-floor arrival rates: [from-rate, to-rate] in arrivals/sec.
+        //   from-rate[f] = lambda[f] * intensity                      (demand ORIGINATING at f)
+        //   to-rate[f]   = sum_o lambda[o] * intensity * destDist[o][f]  (demand DESTINED for f)
+        // This is the 2024 paper's traffic-pattern-awareness mechanism (its 2 rate channels), which we
+        // lacked entirely. Richer than the `pattern` one-hot: it localizes demand rather than naming a
+        // regime. Values are clamped to [0,1] (rates here are < ~1/s; UpPeak's lobby peaks near 0.9).
+        // Uses the NOMINAL rates (the known traffic profile); the paper blends nominal with a rolling
+        // 5-min MEASURED rate (`b*arm + (1-b)*real`) — a measured variant is a later refinement.
+        public void FillArrivalRates(float[] buf)
+        {
+            int F = cfg.numFloors;
+            float I = traffic != null ? traffic.intensity : 1f;
+            for (int f = 0; f < F; f++)
+            {
+                buf[f] = Mathf.Min(1f, arrivals.lambda[f] * I);          // from-rate
+                float to = 0f;
+                for (int o = 0; o < F; o++)
+                    if (o != f) to += arrivals.lambda[o] * I * arrivals.destDist[o][f];
+                buf[F + f] = Mathf.Min(1f, to);                          // to-rate
+            }
+        }
+
+        float[] _rateScratch;
 
         public void WriteObservation(VectorSensor sensor)
         {
@@ -453,6 +478,16 @@ namespace ElevatorRL
 
             if (obs.pattern)
                 sensor.AddOneHotObservation((int)ActivePattern, 5);
+
+            // E13e: per-floor arrival rates (the 2024 paper's rate channels). Order MUST match
+            // ObservationSize: 2*F = [from-rate per floor, then to-rate per floor].
+            if (obs.arrivalRates)
+            {
+                int F2 = cfg.numFloors;
+                if (_rateScratch == null || _rateScratch.Length != 2 * F2) _rateScratch = new float[2 * F2];
+                FillArrivalRates(_rateScratch);
+                for (int i = 0; i < 2 * F2; i++) sensor.AddObservation(_rateScratch[i]);
+            }
 
             // Ceiling/ablation only (EXPERIMENT_PLAN.md E5): exact destination histogram for every
             // waiting and in-car rider. No real controller has this before boarding -- it exists

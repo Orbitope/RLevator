@@ -34,6 +34,17 @@ namespace ElevatorRL
         public bool timeOfDay = false;    // 2   (sin, cos of day phase)
         public bool pattern = false;      // 5   (one-hot traffic regime)
 
+        [Tooltip("2 x F: per-floor arrival RATES — [from-rate, to-rate] (arrivals/sec originating at, " +
+            "and destined for, each floor). This is the 2024 Traffic-Pattern-Aware paper's actual " +
+            "traffic-pattern-awareness mechanism (its 2 `rate` channels on a separate FC pathway), " +
+            "which we were missing entirely — it is far richer than the `pattern` one-hot: it says " +
+            "WHERE demand is and HOW MUCH, not just which named regime. Realistic (buildings know / " +
+            "can measure their traffic profile; the paper blends nominal with a rolling 5-min measured " +
+            "rate). NOTE this also encodes the LOAD LEVEL, so a rate-aware policy can in principle " +
+            "adapt across intensities — directly relevant to the E13c train/eval regime mismatch. " +
+            "See EXPERIMENT_PLAN.md E13e.")]
+        public bool arrivalRates = false; // 2F  (from-rate, to-rate per floor)
+
         [Tooltip("EXACT destination histogram for every waiting AND in-car rider. The HALL portion " +
             "(2 x F x F) is a faithful model of a Destination Control System (DCS: Schindler " +
             "Miconic/PORT, Otis Compass, KONE, TK) where riders enter their destination at a lobby " +

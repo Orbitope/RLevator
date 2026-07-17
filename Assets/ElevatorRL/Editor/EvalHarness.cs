@@ -237,6 +237,21 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv_5m.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures);
 
+        // E13e: baseline flat MLP + arrival-RATE obs (no conv) — isolates the value of the rate
+        // signal. obsSize 286 = 254 baseline + 2*16 rates. MUST pass obsConfigAssetPath (rates are a
+        // non-default block; otherwise RunSingle builds a default config and the input is misaligned).
+        [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-rates, rung M, interfloor, seeds 1-5)")]
+        static void RunE13eSweepMInterfloorRates() => RunScaleLadderSweep("M-e13e-interfloor-rates", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13e_interfloor_rates.onnx", obsSize: 286,
+            obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_Rates.asset",
+            pattern: TrafficPattern.Midday);
+
+        [MenuItem("Tools/Elevator RL/E13 Conv/MATCHED-INTENSITY (1.0) Sweep — rates, rung M, interfloor")]
+        static void RunE13eSweepMInterfloorRatesI10() => RunScaleLadderSweep("M-e13e-interfloor-rates-i10", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13e_interfloor_rates.onnx", obsSize: 286,
+            obsConfigAssetPath: "Assets/ElevatorRL/Config/ObservationConfig_Rates.asset",
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
         // E13d: origin x destination 2D conv. obs_0 = (2,F,F) OD grid, obs_1 = flat 254.
         [MenuItem("Tools/Elevator RL/E13 Conv/Run Sweep (LOOK vs ETA vs PPO-ODconv, rung M, interfloor, seeds 1-5)")]
         static void RunE13dSweepMInterfloorODConv() => RunScaleLadderSweep("M-e13d-interfloor-odconv", 16, 5, 8,

@@ -97,6 +97,11 @@ namespace ElevatorRL.Editor
         [MenuItem("Tools/Elevator RL/E5 Obs Ablations/Point Agent At Baseline Obs Config")]
         static void PointAgentAtObsBaseline() => PointAgentAtObsConfig("ObservationConfig");
 
+        // E13e: baseline + per-floor ARRIVAL RATES (the 2024 paper's traffic-pattern-awareness
+        // mechanism, which we were missing). obsSize = 286 on rung M (254 baseline + 2*16 rates).
+        [MenuItem("Tools/Elevator RL/E13 Conv/Point Agent At Rates Obs Config")]
+        static void PointAgentAtObsRates() => PointAgentAtObsConfig("ObservationConfig_Rates");
+
         // Baseline + pattern one-hot (E12): gives the policy an explicit traffic-regime signal
         // instead of making it infer the regime from indirect hall-call statistics. obsSize = 259
         // (254 baseline + 5 pattern one-hot) on rung M.
