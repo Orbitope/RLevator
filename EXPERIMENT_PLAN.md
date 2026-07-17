@@ -1012,19 +1012,31 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     1. **Unfair budget:** conv=5M vs flat=10M. The flat run's 5M checkpoint was PRUNED
        (`keep_checkpoints: 5` kept only 8.5M-10M), so a matched flat@5M eval is not available without
        retraining — hence the 10M conv extension below is the decisive test.
-    2. **A subtle ConvDispatcher grid mismatch:** conv trains to BETTER reward but evals to WORSE
-       reward/delivered. If the eval grid were subtly transposed/misordered vs. what the training
-       sensor writes, the model would still act (not degenerate → explains ~1,978 rather than 0) but
-       underperform its true ability — exactly this signature. Note values are shared via
-       `Building.FillFloorGrid` (identical by construction); the only possible drift is the flat
-       `float[]`→`TensorShape(1,1,F,8)` NCHW ordering vs. how ML-Agents' `ObservationWriter[ch,h,w]`
-       serializes at train time. Reasoned to match, NOT proven.
+    2. ~~**A subtle ConvDispatcher grid mismatch**~~ — **RULED OUT 2026-07-16 by direct inspection of
+       the actual serialization path** (no need to infer it from the 10M run). Training writes the grid
+       via `ObservationWriter[ch,h,w]`, whose flat index is
+       `TensorExtensions.Index(n,c,h,w) = n*H*W*C + c*H*W + h*W + w`
+       (`com.unity.ml-agents/Runtime/Inference/TensorExtensions.cs:56`), and `SetTarget` builds a
+       3-element visual spec as `TensorShape(batch, shape[0], shape[1], shape[2])` = **NCHW**
+       (C=1, H=16 floors, W=8 features). So training's `writer[0,f,c]` → flat index **`f*8 + c`** —
+       byte-identical to `FillFloorGrid`'s `buf[f*8+c]`, which is exactly how Sentis reads
+       ConvDispatcher's `TensorShape(1,1,F,8)` NCHW tensor. **Train and eval observation orderings are
+       provably the same; the dispatcher is correct and the eval numbers are TRUSTWORTHY.**
+    3. **(new, live hypothesis) Train/eval distribution mismatch → reward-vs-delivered divergence.**
+       Training runs at `TrafficConfig.intensity = 1.0` (+ randomizeActive); eval runs at
+       `SmokeIntensity = 0.5`, no randomization. So "better training reward" is measured in a
+       *heavier-load* regime than the eval. The conv's floor-adjacency bias may specialize to the
+       saturated regime and generalize worse to the lighter eval load — which would explain better
+       training reward AND worse eval delivered/abandoned simultaneously, with no bug involved. If
+       conv@10M still underdelivers, test this by evaluating at intensity 1.0 (matched to training).
     **Decisive test RUNNING: `elev-e13-m-interfloor-conv-01` resumed 5M→10M** (from step 5,000,192,
-    `config/elevator_ppo_e13_interfloor_conv_10m.yaml`, ~4.7h). If conv@10M delivers ≥ flat@10M's
-    2241.8 → explanation (1), conv win is real and confirmed on the headline metric. If conv@10M still
-    delivers ~1,980 despite a much better training reward → explanation (2), and the ConvDispatcher
-    grid ordering must be debugged (e.g. dump the training sensor's serialized obs and byte-compare
-    against `FillFloorGrid`'s buffer).
+    `config/elevator_ppo_e13_interfloor_conv_10m.yaml`, ~4.7h). With (2) ruled out, the read is clean:
+    conv@10M ≥ flat@10M's 2241.8 → explanation (1) (budget), conv win is real on the headline metric.
+    Still ~1,980 despite far better training reward → explanation (3) (train/eval load mismatch), i.e.
+    the conv optimizes the intensity-1.0 training regime in a way that does NOT produce more
+    deliveries at the intensity-0.5 eval regime — a genuine, publishable finding about
+    reward/metric divergence rather than a bug, and a prompt to re-examine the eval intensity choice
+    (which all E2-E13 headline numbers share).
     **Interim honest status: the conv's advantage is established ONLY on training reward; it does NOT
     yet translate to delivered passengers, and may not.**
   - *(superseded note)* **[EVAL PENDING — infra-blocked, NOT a result] delivered-passenger sweep not yet obtained.**
