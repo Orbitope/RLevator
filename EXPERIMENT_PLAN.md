@@ -1196,6 +1196,63 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
     `E13 Conv/Remove Floor-Grid Sensor` → `E13 Conv/Add Floor-OD Sensor` → Build Headless Trainer →
     smoke-train + `scripts/inspect_onnx.py` to confirm obs_0 is (batch,2,16,16) → full 5M run →
     eval (`E13 Conv/Run Sweep ...PPO-ODconv`, plus the MATCHED-INTENSITY 1.0 variant per E13c).
+- **⚠️ E13b WAS IMPLEMENTED WRONG vs the paper — full diff after reading their source (2026-07-16,
+  prompted by the user asking "why not 2D?" then "I think you implemented it quite wrong". They were
+  right on both counts.)** Cloned `jswan95/RL-based-traffic-pattern-aware-elevator-dispatching` and
+  read `Agent.py:QNet_Conv1d` + `elevator_controller.py:get_env_state`.
+  **Their actual architecture** — `env_state = concat([hm, cm, rates.T], axis=1).permute(1,0)` ⇒
+  **(channels, floors)**, fed to:
+  ```
+  conv1 = Conv1d(16, 32, k=5, pad=2); pool(2)   # 20 -> 10 floors
+  conv2 = Conv1d(32, 64, k=5, pad=2); pool(2)   # 10 -> 5
+  conv3 = Conv1d(64, 128, k=5)                  # 5  -> 1
+  fc_rate = Linear(40, 128)                     # SEPARATE pathway for the rate channels
+  fc = Linear(256,128) -> Linear(128, action_dim)   # concat(conv 128, rates 128)
+  ```
+  Channel budget pins the config exactly: `hm`=4 (num_up, num_down, wait_up, wait_down) + `cm`=3/car
+  (moving-down one-hot, moving-up one-hot, **passengers alighting at each floor**) ⇒ 4+3E=16 ⇒
+  **E=4 cars**; rates=2 channels and `Linear(40,·)` ⇒ 2×floors=40 ⇒ **20 floors**. Input **(18, 20)**.
+  | | paper | our E13b |
+  |---|---|---|
+  | features | **in CHANNELS (16)** | on a **spatial axis** (width=8), 1 channel |
+  | spatial axis | **floors only (1D)** | floor × feature (2D) |
+  | kernel | **Conv1d k=5** (5-floor receptive field) | Conv2d 3×3 |
+  | depth | **3 conv + maxpool**, 16→32→64→128, floors 20→10→5→1 | 2 conv, no pooling |
+  | car info | **3 channels/car aligned to floors** (incl. alighting-per-floor = destinations) | 2 aggregate scalars |
+  | **arrival rates** | **2 channels → separate FC → concat** | **ABSENT** |
+  - **Root error: the axis assignment is inverted.** Features have no spatial order, so they belong in
+    channels (as the paper has them); putting them on the width axis makes the kernel slide across
+    `hallUp ↔ hallDown ↔ upAge` as if adjacency meant something. The plan's earlier "minor impurity"
+    note badly understated this. It also capped the encoder (8-wide ⇒ only `match3`, min-res 5).
+  - **Biggest omission: the arrival-RATE channels** — the paper's actual *traffic-pattern-awareness*
+    mechanism (per-floor `real_fr`/`real_tr`, rolling 5-min measured, blended with nominal via
+    `b*arm + (1-b)*past`), NOT a pattern one-hot. We fed no rate signal at all. Their `passenger_in_car`
+    channel is also destination info already aligned to floors — a cleaner version of what E13d's OD
+    matrix reaches for.
+  - **BLOCKER: the paper's architecture is NOT expressible with ML-Agents' built-in encoders** — they
+    are Conv2d with fixed 3×3 kernels and min-resolution ≥5 on BOTH spatial dims, but the paper needs
+    ONE spatial axis (`Visual(18, 20, 1)`; W=1 fails min-res 5). Options: (a) faithful = custom torch
+    network (reintroduces the onnxscript/ONNX-export fragility this project deliberately avoided, twice);
+    (b) native approximation = keep features **in channels** and use **cars as the 2nd spatial axis**
+    (`Visual(C=per-(floor,car) features, H=floors, W=cars)`, W=5 clears match3), and put the **rates in
+    the flat VectorSensor** — ML-Agents concatenates the vector-encoder output with the visual-encoder
+    output, which is *structurally equivalent* to their `fc_rate`+concat. **Chose (b)** per the project's
+    standing no-custom-torch decision.
+- **E13e — arrival-RATE observation [CODE BUILT 2026-07-16, not yet trained]. Cheapest, highest-value
+  fix from the paper diff; no conv involved.** `ObservationConfig.arrivalRates` (2×F: from-rate =
+  `lambda[f]*intensity`, to-rate = `sum_o lambda[o]*intensity*destDist[o][f]`) +
+  `Building.FillArrivalRates` + `ObservationConfig_Rates.asset` (obsSize **286** on M = 254+2×16) +
+  pointer menu + `config/elevator_ppo_e13e_interfloor_rates.yaml` (flat 768×4, **no conv**, so the ONLY
+  variable vs the E12 interfloor baseline is the rate block) + 2 eval menu items (0.5 and
+  matched-intensity 1.0).
+  - Rates are **NEW information** (unlike E13b, which only restructured what the flat obs already had
+    and therefore could only speed up early learning) ⇒ **can move the asymptote**.
+  - Richer than the `pattern` one-hot: localizes demand (*where* and *how much*), not just a regime name.
+  - **Ties to E13c:** the rate block encodes the LOAD LEVEL, so a rate-aware policy can in principle
+    adapt across intensities — potentially defusing the train(1.0)/eval(0.5) mismatch for free. Worth
+    running BOTH eval intensities on this arm.
+  - Uses NOMINAL rates (the known traffic profile). The paper additionally blends a rolling 5-min
+    MEASURED rate; a measured variant is a later refinement if nominal-rates works.
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
