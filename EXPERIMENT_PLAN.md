@@ -903,6 +903,28 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
+- **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch
+  leverage* — the opposite of the old degenerate 13×-overload env, and a place where RL can actually
+  demonstrate value.
+- **Decisive measurement** (`Runs/20260717-112117-V0-rebaseline/summary.csv`, LOOK/ETA/ETA-weighted,
+  S/M/L × {UpPeak,DownPeak,Lunch,Midday} × {nominal 1.0, stress 1.5} × 3 seeds, 216 episodes):
+  - **Solvable:** every nominal cell passes the gate — utilization 0.02–0.14, abandonment < 5% (vs the
+    old env's util 0.75 / 33–70% abandon). Load auto-derived per rung (`population = cars·cap·15`)
+    lands all rungs at ~13/slot day-avg (vs old 216/slot).
+  - **Dispatch has leverage:** 7/24 cells show >8% wait-time spread between the heuristics, up to
+    **21%** (L/UpPeak stress: LOOK 13.6s vs ETA 16.5s). **No dominant heuristic** — LOOK wins the
+    hub-heavy cells (UpPeak, big fleets), ETA wins several interfloor cells (M/Midday: 7.6 vs 8.9s).
+- **Verdict:** PASS. Proceed to V1/V2 with `intensity` 1.0 = nominal, 1.5 = stress. (Load is on the
+  light side — util rarely > 0.3 — but that is realistic and matches the paper; dispatch quality shows
+  up in wait time, not throughput. Leverage concentrates at rungs M/L and the UpPeak/Midday patterns.)
+- **Story beat:** after E15 exposed the 13×-overload artifact and we rewrote the generator, the
+  re-baseline confirms the fix landed: heuristics now *disagree* (they were near-identical on the
+  saturated env because everything just swept), and neither is optimal — so "does RL beat the
+  heuristics?" is finally a fair, non-degenerate question. This is the reset the whole investigation
+  needed.
+- **Repro:** code `cdf9724`; eval menu `Tools/Elevator RL/V0 Re-baseline Sweep`.
+
 ### 🚨 E15 — TRAFFIC REALISM: our environment, not RL, may be the story *(2026-07-16, from reading the paper's generator)*
 **Prompted by "review our traffic generation vs the paper's". This is the most consequential finding
 of the session and it reframes E2-E14.** Read `Passenger.py` (`PassengerGenerator`, `get_rate`,

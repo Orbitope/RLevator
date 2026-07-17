@@ -500,6 +500,24 @@ namespace ElevatorRL.Editor
                 sweepName: "E1-full");
         }
 
+        // EXPERIMENT_PLAN.md V0: heuristic re-baseline on the REWRITTEN traffic generator (E15/V0).
+        // Load is now derived per rung from fleet capacity (TrafficConfig.loadPerSlot=15), so intensity
+        // 1.0 = the calibrated NOMINAL point (~13/slot) and 1.5 = STRESS (~20/slot). Includes Midday
+        // (pure interfloor) which the old E1 sweep omitted. Gate: nominal util < ~0.85 and abandon
+        // < ~15% (solvable-but-nontrivial), stress meaningfully harder. Writes the full metric panel
+        // (delivered/waitMean/waitP95/waitMax/abandoned/abandonRate/util/rwTotal).
+        [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
+        static void RunV0Rebaseline()
+        {
+            RunSweep(
+                presetNames: new[] { "S", "M", "L" },
+                patterns: new[] { TrafficPattern.UpPeak, TrafficPattern.DownPeak, TrafficPattern.Lunch, TrafficPattern.Midday },
+                intensities: new[] { 1.0f, 1.5f },
+                seeds: new[] { 1, 2, 3 },
+                totalSeconds: 3600f, warmupSeconds: 300f, bucketSeconds: 300f,
+                sweepName: "V0-rebaseline");
+        }
+
         static Dictionary<string, BuildingConfig> LoadPresets(string[] presetNames)
         {
             var presets = new Dictionary<string, BuildingConfig>();
