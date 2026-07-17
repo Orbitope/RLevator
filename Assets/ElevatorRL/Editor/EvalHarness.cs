@@ -506,6 +506,15 @@ namespace ElevatorRL.Editor
         // (pure interfloor) which the old E1 sweep omitted. Gate: nominal util < ~0.85 and abandon
         // < ~15% (solvable-but-nontrivial), stress meaningfully harder. Writes the full metric panel
         // (delivered/waitMean/waitP95/waitMax/abandoned/abandonRate/util/rwTotal).
+        // V1/V2 headline: PPO baseline (bignet2 recipe, flat MLP, no arch changes) trained fresh on
+        // the REWRITTEN traffic generator, rung M, Midday (pure interfloor) pattern, nominal load
+        // (intensity 1.0) — the exact regime V0's LOOK/ETA numbers were measured in. This is the
+        // first "does RL beat the heuristics" comparison on the corrected, non-degenerate environment.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday, nominal load, new traffic)")]
+        static void RunV2SweepMMidday() => RunScaleLadderSweep("V2-M-midday", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-midday-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
         [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
         static void RunV0Rebaseline()
         {

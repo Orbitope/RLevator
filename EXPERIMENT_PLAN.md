@@ -903,6 +903,50 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### ✅ V1/V2 — PPO baseline on the rewritten traffic, rung M/Midday, nominal load *(2026-07-17)*
+- **Claim:** on the corrected, non-degenerate traffic (post-E15/V0), PPO — the SAME bignet2 (768×4)
+  recipe used throughout E3-E14, no architecture change — is now *competitive with, and beats on most
+  metrics*, the classical heuristics it lost to for the entire project up to this point.
+- **Decisive measurement** (`Runs/20260717-142225-E3-sweep-V2-M-midday-Midday/sweep_summary.csv`,
+  rung M, Midday/interfloor pattern, intensity 1.0 = nominal, 5 seeds, 3600s eval, LOOK vs ETA vs the
+  freshly-trained `elev-v2-m-midday-01` PPO model, 5M steps):
+
+  | policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+  |---|---|---|---|---|---|---|
+  | LOOK | 419.2 | 9.19s | 27.11s | 5.6 | 0.055 | 4,463.6 |
+  | ETA | 411.0 | 7.69s | 26.53s | 14.4 | 0.055 | 4,326.0 |
+  | **PPO** | **424.4** | 8.78s | **25.10s** | **1.0** | 0.079 | **4,483.4** |
+
+  (all figures = mean over seeds 1-5; per-seed rows in the CSV — PPO delivers more than both heuristics
+  in **every single seed**, and abandons almost nobody in any seed: 0/0/0/4/1 vs LOOK's 6/4/4/10/4 and
+  ETA's 16/13/8/17/18.)
+- **Verdict:** **RL wins on reward, delivered count, abandonment, and tail wait (P95) — the first time
+  in this project PPO has beaten LOOK on its own accumulated reward, not just matched it.** RL only
+  loses on *mean* wait, and only to ETA (LOOK is *worse* than PPO there too, 9.19s vs 8.78s). PPO's
+  utilization (0.079) is ~44% higher than either heuristic (0.055) — it is using more of the fleet's
+  capacity, which is exactly how it delivers more people while abandoning almost none: it is not
+  "smarter routing" of the same small number of trips, it is *running the fleet harder*.
+- **Story beat:** this is the payoff act's opening result, and it directly reverses two things: (1) the
+  whole Act II finding that RL was "failing to optimize its own reward" (E13f, util 0.597 vs LOOK's
+  0.754, LOOK beat trained PPO by 28% on PPO's own reward) — here PPO's reward is the *highest* of the
+  three, and its utilization is the *highest*, i.e. the opposite signature; (2) Act III's root-cause
+  claim that the 13x-overloaded benchmark made "sweep continuously" (=LOOK) near-optimal — on the
+  corrected traffic, sweeping continuously is no longer enough, and the policy that works the fleet
+  hardest (PPO) wins. Read together: **E15's traffic-generator fix, not any architecture change, is what
+  unlocked this** — same net, same trainer, same recipe as every losing run before it, on honest traffic.
+  Important caveats before overclaiming: (a) single pattern (Midday/interfloor), single rung (M), single
+  load point (nominal) — the full V2 ladder (S/L rungs, other patterns, stress load) is still open; (b)
+  ETA still wins mean wait, so "RL wins" is metric-dependent, not unconditional — this is exactly the
+  kind of reward-tradeoff question Axis R (V4+) exists to make explicit, not paper over.
+- **Repro:** git commit (this doc + eval menu item added same commit); model
+  `Assets/ElevatorRL/Models/elev-v2-m-midday-01.onnx`; run id `elev-v2-m-midday-01`
+  (`results/elev-v2-m-midday-01/`, config `config/elevator_ppo_e12_interfloor.yaml` unmodified, 5M
+  steps, reward plateaued ~3,100-3,200 by step 2.5M — noted as a *plateau*, not still-climbing, so 5M was
+  not undertrained here); eval menu `Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday,
+  nominal load, new traffic)`.
+- **Next:** extend the V2 ladder — rung S and L, other patterns (UpPeak/Lunch/DownPeak/day-cycle), and
+  the stress (1.5) load point — before treating this as the headline number for the whole project.
+
 ### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
 - **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch
   leverage* — the opposite of the old degenerate 13×-overload env, and a place where RL can actually

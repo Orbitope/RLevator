@@ -48,12 +48,23 @@ Each "why does RL lose?" hypothesis was killed by a specific number:
     wait-time spread) and neither is optimal — a solvable, non-degenerate regime. The question "can RL
     beat the heuristics?" is fair again. **← we are here.**
 
-## Act IV — The payoff (planned)
-- **Does RL win now?** Re-run the ladder (PPO, then MA-POCA / BC-from-LOOK, targeting the diagnosed
-  search failure) on realistic traffic.
-- **If it wins — the tradeoffs.** Reward variants (longest-wait vs journey-time vs lobby-priority),
-  and the money question: **is destination-dispatch (omniscient info — a big capex + "use an app" UX
-  cost) worth the wait-time it saves?** Let the measured seconds decide.
+## Act IV — The payoff
+
+12. **Does RL win now? First data point: yes — with a caveat.** Same PPO recipe that lost for the
+    entire project, retrained from scratch on the corrected traffic (rung M, interfloor pattern,
+    nominal load): it now delivers *more* passengers than LOOK or ETA in every one of 5 seeds, abandons
+    almost nobody (avg 1.0 vs LOOK's 5.6 and ETA's 14.4), scores the *highest* reward of the three, and
+    beats both on tail wait (P95). It only loses on *mean* wait, and only to ETA — LOOK is worse than
+    PPO there too. **The exact failure signature from Act II (low reward, low utilization) is now
+    reversed**: PPO's utilization is the highest of the three, not the lowest — it's running the fleet
+    harder, not routing the same trips more cleverly. Same net. Same trainer. Same hyperparameters.
+    The only thing that changed was the traffic generator. **← we are here — one rung, one pattern, one
+    load point; the ladder continues before this becomes the headline.**
+- **If it keeps winning — the tradeoffs.** Reward variants (longest-wait vs journey-time vs
+  lobby-priority) — note ETA still wins mean wait here, so "RL wins" is already metric-dependent, which
+  is exactly what the reward-tradeoff axis is for. And the money question: **is destination-dispatch
+  (omniscient info — a big capex + "use an app" UX cost) worth the wait-time it saves?** Let the
+  measured seconds decide.
 - **How far does multi-agent coordination scale?** Bigger fleets, zoning — where RL *should* win most.
 
 ## Lessons (the actual thesis)
