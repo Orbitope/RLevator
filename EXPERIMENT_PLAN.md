@@ -915,6 +915,22 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   Arithmetic: Midday `lambda=0.15`/floor x 16 floors = 2.40 arrivals/s @1.0 (8,640/hr) vs 1.20/s @0.5
   (4,320/hr); measured fleet throughput (LOOK @0.5) ≈ 0.73/s (2,620/hr). Sanity-checked against the
   eval CSV: LOOK 2620 delivered + 1298 abandoned = 3918 of 4320 arrivals (91%, rest in-flight). ✔
+- **MECHANISM — the two regimes present DIFFERENT OBJECTIVES under the same reward function**
+  (weights: `delivered +10`, `abandoned -8`, `inQueue -0.12`/passenger-second). Deliveries are
+  throughput-capped at ~0.73/s *regardless of policy* (fleet physics), so raising load does not raise
+  achievable deliveries — it only inflates the penalty terms:
+  | regime | delivered term | abandoned term | inQueue term | net |
+  |---|---|---|---|---|
+  | **TRAIN @1.0** (1024s) | ~748 x10 = **+7,475** | ~1710 x-8 = **-13,681** | ~108 standing x1024s x-0.12 = **-13,271** | **~78% penalty-dominated** (observed converged reward ~-15,000 — same order ✔) |
+  | **EVAL @0.5** (3600s) | LOOK 2620 x10 = **+26,200** | 1298 x-8 = -10,384 | — | LOOK rwTotal **+5.3k..+6.9k (NET POSITIVE)** |
+  So at 3.3x the only real lever is **triaging queue-seconds/abandonment of an unservable backlog**
+  (deliveries are capped and contribute a minority of reward); at 1.65x the lever is **actually
+  serving people**, and a good policy goes net-positive. **Training and eval therefore optimize
+  practically different objectives — which is exactly how a policy can be better in one and worse in
+  the other with no bug.** Model validated against the data: it predicts ~39% abandonment @0.5
+  (measured 33%) and **rejected=0 in both regimes — matching the eval CSV exactly** (queues stay
+  ~3.4/queue @1.0 and ~1.7/queue @0.5, both under `maxQueue=12`, because `maxWait=45s` abandonment
+  caps them before rejection).
 - **Why this matters (likely reframes E2-E13):** at 3.3x overload ~70% of passengers can NEVER be
   served, so training reward is dominated by triaging a hopeless standing backlog (the -0.12/
   passenger-second queue term over thousands of waiting riders, plus -8/abandon). At 1.65x over a
@@ -924,6 +940,24 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   matches LOOK, never decisively beats it"*, and a no-bug explanation for E13b's
   better-training-reward / worse-eval-delivered divergence (the conv may simply specialize harder to
   the 3.3x regime).
+- **Scoped tightly — everything ELSE about train vs eval is verified IDENTICAL** (checked 2026-07-16,
+  because `RunSingle` builds a *fresh* `BuildingConfig` and only explicitly sets floors/cars/capacity/
+  randomize, leaving the rest at C# field defaults — so any field the M preset overrides differently
+  would be a silent mismatch). It isn't:
+  | field | C# default (eval) | M preset (train) | |
+  |---|---|---|---|
+  | maxQueue | 12 | 12 | ✔ |
+  | maxWait | 45 | 45 | ✔ |
+  | decisionInterval | 0.5 | 0.5 | ✔ |
+  | floorTravelTime | 1.6 | 1.6 | ✔ |
+  | dwellTime | 1.2 | 1.2 | ✔ |
+  | doorTime | 0.8 | 0.8 | ✔ |
+  | randomizeActive | false (forced) | 0 | ✔ |
+  | serviceChangeProbability | 0 (forced) | 0 | ✔ |
+  | capacity / floors / cars | 8 / 16 / 5 (set) | 8 / 16 / 5 | ✔ |
+  **So the simulated building is identical; ONLY the traffic load regime and episode horizon differ.**
+  (Also independently ruled out: the ConvDispatcher grid ordering — see E13b hypothesis 2.) This makes
+  the confound precise rather than a vague "configs drifted".
 - **Note:** `EvalHarness`'s own comment already flagged that intensity=1.0 saturates rung S and chose
   0.5 as "representative, non-saturated" for eval — but training was never moved to match, and 0.5 is
   *still* 1.65x oversaturated on M/Midday. So the eval intensity was chosen deliberately; the mistake
