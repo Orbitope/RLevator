@@ -903,6 +903,55 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### ⚠️ E13c — TRAIN/EVAL REGIME MISMATCH: a project-wide methodological confound *(discovered 2026-07-16)*
+- **Every RL result in this project (E2-E13) trains in one regime and is scored in a different one.**
+  Found while investigating why E13b's conv has better training reward but worse eval delivered.
+  | | TRAINING | EVAL | mismatch |
+  |---|---|---|---|
+  | traffic intensity | `TrafficConfig.asset` **1.0** | `EvalHarness.SmokeIntensity` **0.5** | **2x** |
+  | load vs fleet capacity (rung M, Midday) | **~3.30x oversaturated** | **~1.65x oversaturated** | different *regime* |
+  | implied unservable share | ~70% must abandon | ~33% abandon (measured: LOOK 1298/3918) | — |
+  | episode duration | 2047 decisions x 0.5s = **1024 sim-sec (17 min)** | **3600 sim-sec (60 min)** | **3.5x longer** |
+  Arithmetic: Midday `lambda=0.15`/floor x 16 floors = 2.40 arrivals/s @1.0 (8,640/hr) vs 1.20/s @0.5
+  (4,320/hr); measured fleet throughput (LOOK @0.5) ≈ 0.73/s (2,620/hr). Sanity-checked against the
+  eval CSV: LOOK 2620 delivered + 1298 abandoned = 3918 of 4320 arrivals (91%, rest in-flight). ✔
+- **Why this matters (likely reframes E2-E13):** at 3.3x overload ~70% of passengers can NEVER be
+  served, so training reward is dominated by triaging a hopeless standing backlog (the -0.12/
+  passenger-second queue term over thousands of waiting riders, plus -8/abandon). At 1.65x over a
+  3.5x longer horizon, sustained/fair service is achievable and rewarded differently. **These are
+  qualitatively different control problems.** The RL policies are optimized for a regime they are
+  never evaluated in — a plausible root cause for the project's central narrative that *"RL only ever
+  matches LOOK, never decisively beats it"*, and a no-bug explanation for E13b's
+  better-training-reward / worse-eval-delivered divergence (the conv may simply specialize harder to
+  the 3.3x regime).
+- **Note:** `EvalHarness`'s own comment already flagged that intensity=1.0 saturates rung S and chose
+  0.5 as "representative, non-saturated" for eval — but training was never moved to match, and 0.5 is
+  *still* 1.65x oversaturated on M/Midday. So the eval intensity was chosen deliberately; the mistake
+  is that training/eval were never reconciled.
+- **Independent corroboration from this project's OWN E1 calibration (§3, line ~211):** the measured
+  saturation base (where LOOK's abandonRate ≈ 10%) for **rung M is ≈0.41**. So:
+  - eval @0.5 = **1.22x** M's calibrated base → roughly *at* the intended operating point ✔
+  - training @1.0 = **2.4x** M's calibrated base → far past it, deep in overload ✘
+  We already knew the right intensity for M and evaluate near it — but train at 2.4x that value. This
+  is not a judgement call about which regime is "right"; training is simply off-calibration by the
+  project's own measured standard.
+- **TEST READY (not yet run — needs a free machine; the 10M conv run currently holds it):**
+  `RunScaleLadderSweep` is now intensity-parametrized, plus two menu items under
+  `Tools/Elevator RL/E13 Conv/`: **MATCHED-INTENSITY (1.0) Sweep — conv** and **— flat MLP 10M**.
+  Run both at 1.0 and compare to the 0.5 numbers (conv 1978.4 / flat 2241.8 / LOOK 2619.8):
+  - conv beats flat @1.0 but loses @0.5 → **confirms regime specialization**; the conv win is real
+    *in its training regime*, and the project's eval methodology needs reconciling with training.
+  - conv loses @1.0 too → the conv's training-reward edge is not a policy-quality edge at all;
+    look instead at reward-term composition (it may be farming `movedToward`/queue-seconds rather
+    than deliveries).
+  - **Also worth checking: how do LOOK/ETA fare @1.0?** If RL closes on (or beats) LOOK at 1.0 while
+    losing at 0.5, that is a headline result in itself — RL wins under heavy overload.
+- **Follow-ups if confirmed:** (1) decide the *intended* operating regime and make train+eval agree
+  (either train at 0.5, or eval at 1.0, or sweep intensity as a first-class axis — E1 already has
+  calibrated per-rung saturation points, §3: S≈1.33, M≈0.41 — note M's calibrated point is **0.41**,
+  which is close to the eval's 0.5 and far from training's 1.0); (2) reconcile episode horizon
+  (1024 vs 3600 sim-sec); (3) re-read all E2-E13 conclusions through this lens before publishing.
+
 ### E13 — Sequence/spatial architectures for the interfloor gap *(IN PROGRESS)*
 - **Trigger:** E12 interfloor loss (-14.4% vs LOOK). Hypothesis under test: the flat MLP over a
   single-snapshot, concatenated observation lacks the inductive bias to handle spread-out interfloor

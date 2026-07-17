@@ -237,6 +237,22 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv_5m.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures);
 
+        // ── E13c: MATCHED-INTENSITY eval (intensity 1.0 = the regime these policies were TRAINED in).
+        // Every E2-E13 headline used intensity 0.5 while training ran at 1.0 (M fleet ~3.30x
+        // oversaturated @1.0 vs ~1.65x @0.5) — so RL has always been scored in a regime it never
+        // trained on. These two run the SAME models/pattern at 1.0 to test whether the conv's
+        // training-reward advantage shows up when eval matches training. See EXPERIMENT_PLAN.md E13c.
+        [MenuItem("Tools/Elevator RL/E13 Conv/MATCHED-INTENSITY (1.0) Sweep — conv, rung M, interfloor")]
+        static void RunE13SweepMInterfloorConvI10() => RunScaleLadderSweep("M-e13-interfloor-conv-i10", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e13_interfloor_conv_5m.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, conv: true, gridFeatures: Building.FloorGridFeatures,
+            intensity: 1.0f);
+
+        [MenuItem("Tools/Elevator RL/E13 Conv/MATCHED-INTENSITY (1.0) Sweep — flat MLP 10M, rung M, interfloor")]
+        static void RunE13SweepMInterfloorFlatI10() => RunScaleLadderSweep("M-e12-interfloor-flat10M-i10", 16, 5, 8,
+            "Assets/ElevatorRL/Models/ElevatorController_M_e12_interfloor_10m.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
         // EXPERIMENT_PLAN.md E6 Architecture A (multi-agent parameter sharing): same protocol as the
         // flat-MLP E3 M sweeps above, but the shared per-car policy runs through
         // MultiAgentPpoDispatcher. obsSize here is the PER-CAR observation size (CarObservationSize),
@@ -265,9 +281,15 @@ namespace ElevatorRL.Editor
             string modelPath, int obsSize, bool multiAgent = false, bool attention = false,
             int globalObsSize = 0, int carEntitySize = 0, int maxNumObservables = 0,
             string obsConfigAssetPath = null, TrafficPattern pattern = TrafficPattern.UpPeak,
-            bool recurrent = false, int memorySize = 0, bool conv = false, int gridFeatures = 0)
+            bool recurrent = false, int memorySize = 0, bool conv = false, int gridFeatures = 0,
+            float intensity = SmokeIntensity, float totalSeconds = 3600f)
         {
-            const float totalSeconds = 3600f, warmup = 300f, bucket = 300f;
+            // NOTE (E13/2026-07-16): `intensity` defaults to SmokeIntensity (0.5) — the value every
+            // E2-E13 headline number used — but TRAINING runs at TrafficConfig.intensity = 1.0. That
+            // is a real train/eval mismatch: @1.0 the M fleet is ~3.30x oversaturated (~70% must
+            // abandon) vs ~1.65x @0.5, and training episodes are 2047*0.5s = 1024 sim-sec vs eval's
+            // 3600. Pass intensity: 1.0 to evaluate a policy in the regime it was actually trained in.
+            const float warmup = 300f, bucket = 300f;
             int[] seeds = { 1, 2, 3, 4, 5 };
 
             // Force a fresh import so a model file overwritten/copied on disk (common: cp a new
@@ -314,12 +336,12 @@ namespace ElevatorRL.Editor
             foreach (var seed in seeds)
             {
                 var (look, _) = RunSingle("LOOK", ElevatorHeuristics.CollectiveLook, rungName,
-                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+                    floors, cars, capacity, pattern, intensity, seed, totalSeconds, warmup, bucket, quiet: true);
                 var etaHeuristic = new EtaHeuristic(cars);
                 var (eta, _) = RunSingle("ETA", etaHeuristic.Dispatch, rungName,
-                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true);
+                    floors, cars, capacity, pattern, intensity, seed, totalSeconds, warmup, bucket, quiet: true);
                 var (ppoEp, _) = RunSingle("PPO", ppoDispatch, rungName,
-                    floors, cars, capacity, pattern, SmokeIntensity, seed, totalSeconds, warmup, bucket, quiet: true,
+                    floors, cars, capacity, pattern, intensity, seed, totalSeconds, warmup, bucket, quiet: true,
                     obsConfigOverride: obsConfigOverride);
 
                 foreach (var (name, e) in new[] { ("LOOK", look), ("ETA", eta), ("PPO", ppoEp) })
