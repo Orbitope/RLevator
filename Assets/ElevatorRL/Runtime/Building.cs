@@ -49,7 +49,6 @@ namespace ElevatorRL
 
         Acc _acc;
         readonly System.Random _rng;
-        bool _patternLoaded;
 
         public Building(BuildingConfig cfg, RewardConfig reward, ObservationConfig obs, TrafficConfig traffic, int seed)
         {
@@ -80,7 +79,6 @@ namespace ElevatorRL
             DeliveredTotal = RejectedTotal = AbandonedTotal = WaitCount = 0;
             WaitSum = MaxWaitObserved = 0f;
             RwTotal = RwDelivered = RwToward = RwAway = RwRejected = RwAbandoned = RwInElevator = RwInQueue = 0;
-            _patternLoaded = false;
 
             for (int f = 0; f < cfg.numFloors; f++) { upQ[f].Clear(); downQ[f].Clear(); }
 
@@ -128,13 +126,15 @@ namespace ElevatorRL
 
         void UpdatePattern(bool force)
         {
-            TrafficPattern want = traffic.useDayCycle ? traffic.PatternForTime(simTime) : traffic.defaultPattern;
-            if (force || !_patternLoaded || want != ActivePattern)
-            {
-                ActivePattern = want;
-                arrivals.LoadPattern(want);
-                _patternLoaded = true;
-            }
+            // E15: rates are now TIME-VARYING (48 x 15-min interpolated bins), so this must recompute
+            // every tick, not just when the named pattern changes. Cost is 3 interpolations + F + F*F
+            // writes — negligible. `useDayCycle` means the paper's "AllInOne": the full 12h day profile
+            // rather than a 3h slice, so the day cycle now falls out of the rate tables themselves
+            // instead of switching between hand-tuned pattern presets.
+            bool allInOne = traffic.useDayCycle;
+            TrafficPattern want = allInOne ? traffic.PatternForTime(simTime) : traffic.defaultPattern;
+            ActivePattern = want;
+            arrivals.LoadPatternAtTime(want, allInOne, simTime, traffic.population);
         }
 
         void SpawnArrivals(float dt)
