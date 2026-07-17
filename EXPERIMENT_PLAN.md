@@ -1140,6 +1140,24 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
 - **Sequencing (per user 2026-07-15):** architecture work started in parallel now rather than waiting
   for Lunch/DownPeak data; runs sequenced (not concurrent) to avoid the machine oversubscription that
   has been destabilizing the Unity Editor.
+- **OPERATIONAL RULES for the Unity Editor (learned the hard way 2026-07-15/16 — read before any
+  Editor work):**
+  1. **Editor work and training CANNOT overlap.** Under a 20-env run the Editor goes
+     idle-unresponsive: cheap reads may slip through but `recompile_scripts`/`execute_menu_item`
+     never even register server-side. Verified twice. Batch Editor work into a training gap.
+  2. **Freeing the machine does NOT revive an already-wedged bridge** — it needs an Editor restart.
+  3. **Claude CANNOT launch the Editor.** Both `open -a Unity.app --args ...` and direct
+     `Unity.app/Contents/MacOS/Unity ...` (even with `-useHub -hubIPC -licensingIpc
+     LicenseClient-<user>`) HANG at startup, log stalling at
+     `[Licensing::Module] Licensing Background thread has ended` with 0% CPU and the WebSocket server
+     never starting. The working Editor process had session-specific `-hubSessionId <uuid>` and
+     `-accessToken <token>` flags that only a **Unity Hub UI launch** provides and which cannot be
+     fabricated. **=> The user must open the project from Unity Hub.** Ask; don't burn cycles retrying.
+  4. `kill -9` on the Editor leaves a stale `Temp/UnityLockfile`; remove it before relaunching
+     (`rm -f Temp/UnityLockfile`). (Necessary but NOT sufficient — see 3.)
+  5. Training is checkpointed (`keep_checkpoints: 5`, every 500k), so pausing a run to free the
+     machine for Editor work costs only the steps since the last checkpoint and resumes via
+     `scripts/resume_training.sh` — cheap. But only pause if the Editor is actually launchable (3).
 - **Editor-vs-training instability (confirmed 2026-07-15):** the Unity Editor cannot reliably serve
   the MCP bridge while a 20-env training run saturates the machine — cheap reads (`get_scene_info`)
   slip through but menu-execute/build/recompile stall the main thread and freeze it (needs a manual
