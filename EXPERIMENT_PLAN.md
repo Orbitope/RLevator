@@ -989,9 +989,55 @@ thesis-confirming* trend instead of a confound to explain away — the E15 traff
 possible. abandonment tells the same story even more starkly: ETA's abandonment nearly doubles S→L
 faster than LOOK's (worse dispatch quality is punished more at scale), while PPO's stays near zero at
 every rung.
-- **Next:** other patterns (UpPeak/Lunch/DownPeak/day-cycle) and the stress (1.5) load point, per the
-  original plan — before calling the S→M→L trend final. Z/H rungs (zoning/heterogeneous fleets) are
-  where the thesis predicts the RL edge should be largest of all (V-final).
+**Stress load (1.5×) at S and M** — completes the nominal/stress pair, trained unattended via the new
+pre-build-then-train workflow (`scripts/batch_v2_queue1.sh`, three 5M-step runs chained with zero Unity
+interaction between them):
+
+| S-stress | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 373.8 | 6.29s | 17.88s | 0.0 | 0.048 | 3,781.2 |
+| ETA | 372.4 | 6.29s | 20.67s | 1.6 | 0.049 | 3,744.4 |
+| PPO | 372.8 | 6.51s | **16.41s** | 0.4 | 0.065 | 3,702.8 |
+
+| M-stress | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 627.2 | **8.88s** | 25.57s | 4.0 | 0.085 | **6,724.8** |
+| ETA | 615.8 | 8.32s | 26.16s | 15.4 | 0.084 | 6,482.8 |
+| PPO | **631.4** | 9.55s | **24.59s** | **0.4** | 0.111 | 6,639.2 |
+
+**S-stress: still a wash**, same as S-nominal — confirms the tie isn't load-dependent, just a
+small-fleet-has-slack effect. **M-stress is a genuine mixed result, not a repeat of M-nominal's clean
+win**: PPO still wins delivered (+0.7%/+2.5%), P95 tail wait, and cuts abandonment ~90%/97% — but LOOK
+edges ahead on total reward (+1.3%) and PPO has the *worst* mean wait of the three (9.55s). **Say so
+plainly: the M win is not uniform across load — nominal load favored PPO cleanly, stress load produces
+a split decision** (PPO wins throughput/tail/abandonment, LOOK wins the accumulated-reward and
+mean-wait columns). This is exactly the kind of result the reward-tradeoff axis (V4+ Axis R) exists to
+make legible rather than paper over with a single "PPO wins" headline.
+
+**UpPeak, rung M, nominal load — the largest, cleanest win of the entire project:**
+
+| M/UpPeak | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 232.6 | 12.00s | 31.99s | 3.0 | 0.036 | 2,466.8 |
+| ETA | 232.8 | 11.99s | 29.25s | 2.8 | 0.036 | 2,474.2 |
+| **PPO** | **235.4** | **5.79s** | **18.99s** | **0.0** | 0.053 | **2,630.4** |
+
+PPO wins **every single metric, decisively**: delivered (+1.2%/+1.1%), mean wait **cut in half**
+(5.79s vs ~12s for both heuristics — a 52% reduction), P95 tail wait (41%/35% better), zero
+abandonment (vs 3.0/2.8), and reward (+6.6%/+6.3%). **UpPeak was the ONLY pattern ever tested for most
+of this project's history (E1-E11, before E12 discovered that)** — every one of those runs concluded
+"RL doesn't beat LOOK," on the OLD degenerate generator. On the corrected traffic, the exact same
+pattern that anchored the project's original pessimistic narrative is now its single strongest result.
+UpPeak's structure (nearly everyone converging on/from one floor) is plausibly the most learnable/
+exploitable pattern of all — much more so than Midday's distributed interfloor traffic — which may
+explain why the margin here dwarfs every Midday result on the ladder.
+- **Next:** Lunch/DownPeak/day-cycle patterns and rung L at stress load, per the original plan —
+  before calling the pattern×load matrix final. Z/H rungs (zoning/heterogeneous fleets) are where the
+  thesis predicts the RL edge should be largest of all (V-final).
+- **Repro:** all three trained via `scripts/batch_v2_queue1.sh` (chained, zero Editor interaction
+  during training — see the new pre-build-then-train workflow in `CLAUDE.md`); evals via
+  `Tools/Elevator RL/V1-V2 Sweep (... rung S/M, ... STRESS ...)` and `(... rung M, UpPeak ...)`; models
+  `elev-v2-s-midday-stress-01.onnx`, `elev-v2-m-midday-stress-01.onnx`, `elev-v2-m-uppeak-01.onnx`.
 
 ### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
 - **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch

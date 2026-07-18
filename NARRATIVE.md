@@ -73,9 +73,23 @@ Each "why does RL lose?" hypothesis was killed by a specific number:
     of any rung so far, and cuts abandonment by ~90% vs LOOK and ~95% vs ETA (1.6 vs 16.4 vs 30.0 riders
     left behind). **S → M → L is now a clean, monotonic, thesis-confirming trend** — tie, then win, then
     bigger win — the first time this project's scale ladder has told a coherent story instead of a
-    confound to explain away. **← we are here.** Other patterns and the stress load point are still
-    open before calling this final, but the shape of the result already matches the bet made on day one:
+    confound to explain away. The shape of the result already matches the bet made on day one:
     RL doesn't beat LOOK where LOOK is already near-optimal, and wins by more as coordination gets harder.
+15. **Stress load complicates the story honestly — and that's the point.** Trained overnight,
+    unattended, with zero Editor interaction (a new pre-build-then-train workflow: every rung built to
+    its own persistent path first, then training runs chained back-to-back). S at 1.5× load: still a
+    wash, confirming the tie isn't a load artifact. M at 1.5× load: **not a repeat of the clean nominal
+    win** — PPO still delivers more, cuts tail wait, and cuts abandonment ~90-97%, but LOOK edges ahead
+    on total reward and PPO has the *worst* mean wait of the three. Reported plainly rather than
+    smoothed over: the M win is real at nominal load and genuinely mixed at stress load.
+16. **UpPeak, rung M — the single largest, cleanest win of the entire project.** PPO wins every metric:
+    delivered (+1.2%), mean wait **cut in half** (5.79s vs ~12s for both heuristics), tail wait
+    (35-41% better), zero abandonment, reward (+6.6%). The twist: **UpPeak was the only pattern this
+    project ever tested for most of its history (E1-E11)** — every one of those early runs concluded
+    "RL doesn't beat LOOK," on traffic later shown to be degenerate (E15). The exact pattern that
+    anchored the project's original pessimism is now, on honest traffic, its strongest result — likely
+    because UpPeak's converge-on-one-floor structure is the most learnable/exploitable pattern of all,
+    more so than Midday's diffuse interfloor traffic. **← we are here.**
 - **If it keeps winning — the tradeoffs.** Reward variants (longest-wait vs journey-time vs
   lobby-priority) — note ETA still wins mean wait here, so "RL wins" is already metric-dependent, which
   is exactly what the reward-tradeoff axis is for. And the money question: **is destination-dispatch

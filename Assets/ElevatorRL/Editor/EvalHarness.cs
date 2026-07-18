@@ -526,6 +526,24 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/elev-v2-l-midday-01.onnx", obsSize: 648,
             pattern: TrafficPattern.Midday, intensity: 1.0f);
 
+        // V0/V2 stress load point (intensity 1.5), completing the nominal/stress pair at S and M.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung S, midday, STRESS load, new traffic)")]
+        static void RunV2SweepSMiddayStress() => RunScaleLadderSweep("V2-S-midday-stress", 8, 3, 8,
+            "Assets/ElevatorRL/Models/elev-v2-s-midday-stress-01.onnx", obsSize: 98,
+            pattern: TrafficPattern.Midday, intensity: 1.5f);
+
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday, STRESS load, new traffic)")]
+        static void RunV2SweepMMiddayStress() => RunScaleLadderSweep("V2-M-midday-stress", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-midday-stress-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, intensity: 1.5f);
+
+        // Pattern coverage: rung M, UpPeak (the only pattern tested for most of this project's
+        // history pre-E12/E15), nominal load, on the corrected traffic.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, UpPeak, nominal load, new traffic)")]
+        static void RunV2SweepMUpPeak() => RunScaleLadderSweep("V2-M-uppeak", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-uppeak-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.UpPeak, intensity: 1.0f);
+
         [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
         static void RunV0Rebaseline()
         {
