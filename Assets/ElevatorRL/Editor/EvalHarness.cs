@@ -520,6 +520,12 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/elev-v2-s-midday-01.onnx", obsSize: 98,
             pattern: TrafficPattern.Midday, intensity: 1.0f);
 
+        // 10M steps (extended from 5M -- reward was still climbing at the 5M cutoff, unlike S/M).
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung L, midday, nominal load, new traffic, 10M)")]
+        static void RunV2SweepLMidday() => RunScaleLadderSweep("V2-L-midday", 30, 8, 8,
+            "Assets/ElevatorRL/Models/elev-v2-l-midday-01.onnx", obsSize: 648,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
         [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
         static void RunV0Rebaseline()
         {

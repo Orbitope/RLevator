@@ -964,9 +964,34 @@ LOOK by much on small buildings where LOOK is already near-optimal; the hypothes
 RL's edge shows up at scale/constraint (M/L/Z/H), which is exactly what the M result above starts to
 show. S is the control point that says "the M win isn't just noise across every rung" — it isn't a
 free lunch everywhere.
-- **Next:** extend the V2 ladder to rung L (larger, more coordination-dependent fleet — the rung this
-  thesis predicts should show the *largest* RL edge), other patterns (UpPeak/Lunch/DownPeak/day-cycle),
-  and the stress (1.5) load point — before treating M's win as the headline number for the whole project.
+**Rung L follow-up (8 cars/30 floors, extended 5M→10M — reward was still climbing at 5M, unlike
+S/M):** `Runs/20260717-225249-E3-sweep-V2-L-midday-Midday/sweep_summary.csv` (model
+`elev-v2-l-midday-01.onnx`, obsSize 648):
+
+| policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 634.4 | 10.59s | 30.34s | 16.4 | 0.089 | 7,659.6 |
+| ETA | 619.8 | **9.75s** | 32.20s | 30.0 | 0.089 | 7,362.2 |
+| **PPO** | **649.6** | 10.56s | **28.76s** | **1.6** | 0.108 | **7,931.2** |
+
+**This is the largest, cleanest PPO win of the ladder so far.** PPO beats both heuristics on delivered
+(+2.4% vs LOOK, +4.8% vs ETA), reward (+3.5% / +7.7%), and tail wait (P95 5.5% better than LOOK, 10.7%
+better than ETA) — and cuts abandonment by ~90% vs LOOK and ~95% vs ETA (1.6 vs 16.4 vs 30.0). Same
+pattern as M: ETA still wins on *mean* wait (9.75s), and PPO is running the fleet harder to get there
+(util 0.108 vs ~0.089 for both heuristics, a ~22% increase) — same "runs the fleet harder, not smarter
+routing of the same trips" signature as M, just more pronounced.
+
+**The scale trend across the whole ladder is now visible and matches the project's founding thesis
+exactly:** rung S was a **tie** (RL was never expected to win where LOOK is already near-optimal) →
+rung M was a **clear win** → rung L (bigger, more coordination-dependent fleet) is the **largest win**.
+This is the first time in the project's history that the scale ladder has produced a *monotonic,
+thesis-confirming* trend instead of a confound to explain away — the E15 traffic fix is what made that
+possible. abandonment tells the same story even more starkly: ETA's abandonment nearly doubles S→L
+faster than LOOK's (worse dispatch quality is punished more at scale), while PPO's stays near zero at
+every rung.
+- **Next:** other patterns (UpPeak/Lunch/DownPeak/day-cycle) and the stress (1.5) load point, per the
+  original plan — before calling the S→M→L trend final. Z/H rungs (zoning/heterogeneous fleets) are
+  where the thesis predicts the RL edge should be largest of all (V-final).
 
 ### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
 - **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch

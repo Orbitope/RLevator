@@ -67,8 +67,15 @@ Each "why does RL lose?" hypothesis was killed by a specific number:
     RL was never expected to beat LOOK by much where LOOK is already near-optimal (small buildings);
     the bet has always been that the edge appears at scale/constraint. **S as a tied control point makes
     M's win more credible, not less — it isn't a rising tide lifting every rung.**
-    **← we are here — S confirms the easy case is a wash; L (bigger, more coordination-dependent fleet)
-    is the rung the thesis says should show the largest edge, and is next.**
+14. **Rung L: the largest win yet — the trend is monotonic.** Bigger fleet (8 cars/30 floors), same
+    recipe, extended to 10M steps because reward was still climbing at 5M (unlike S and M, which had
+    both plateaued). PPO beats both heuristics on delivered, reward, AND tail wait by the widest margin
+    of any rung so far, and cuts abandonment by ~90% vs LOOK and ~95% vs ETA (1.6 vs 16.4 vs 30.0 riders
+    left behind). **S → M → L is now a clean, monotonic, thesis-confirming trend** — tie, then win, then
+    bigger win — the first time this project's scale ladder has told a coherent story instead of a
+    confound to explain away. **← we are here.** Other patterns and the stress load point are still
+    open before calling this final, but the shape of the result already matches the bet made on day one:
+    RL doesn't beat LOOK where LOOK is already near-optimal, and wins by more as coordination gets harder.
 - **If it keeps winning — the tradeoffs.** Reward variants (longest-wait vs journey-time vs
   lobby-priority) — note ETA still wins mean wait here, so "RL wins" is already metric-dependent, which
   is exactly what the reward-tradeoff axis is for. And the money question: **is destination-dispatch
