@@ -944,8 +944,29 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   steps, reward plateaued ~3,100-3,200 by step 2.5M — noted as a *plateau*, not still-climbing, so 5M was
   not undertrained here); eval menu `Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday,
   nominal load, new traffic)`.
-- **Next:** extend the V2 ladder — rung S and L, other patterns (UpPeak/Lunch/DownPeak/day-cycle), and
-  the stress (1.5) load point — before treating this as the headline number for the whole project.
+
+**Rung S follow-up (same day, same recipe/pattern/load):** confirms the project's own thesis rather
+than complicating it. `Runs/20260717-174511-E3-sweep-V2-S-midday-Midday/sweep_summary.csv` (model
+`elev-v2-s-midday-01.onnx`, obsSize 98 — baseline obs scales with floors/cars, NOT the 254 used at M):
+
+| policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 250.8 | 5.96s | 16.93s | 0.0 | 0.032 | 2,553.6 |
+| ETA | 250.6 | 5.36s | 15.28s | 0.4 | 0.032 | 2,563.4 |
+| PPO | 251.0 | 5.58s | **13.48s** | 0.0 | 0.040 | 2,543.0 |
+
+Essentially a **three-way tie on delivered/reward** at rung S (all within ~0.8%, no abandonment
+anywhere — the small fleet has slack, so dispatch quality barely moves throughput). PPO still cuts
+tail wait meaningfully (P95 13.5s vs LOOK's 16.9s, ~20% better) but that's the only lever left to pull
+when everyone gets served anyway. **This is the expected, not the interesting, result** — per the
+project's original thesis (`[[rlevator-project]]` memory, 2026-07-09): RL was never expected to beat
+LOOK by much on small buildings where LOOK is already near-optimal; the hypothesis has always been that
+RL's edge shows up at scale/constraint (M/L/Z/H), which is exactly what the M result above starts to
+show. S is the control point that says "the M win isn't just noise across every rung" — it isn't a
+free lunch everywhere.
+- **Next:** extend the V2 ladder to rung L (larger, more coordination-dependent fleet — the rung this
+  thesis predicts should show the *largest* RL edge), other patterns (UpPeak/Lunch/DownPeak/day-cycle),
+  and the stress (1.5) load point — before treating M's win as the headline number for the whole project.
 
 ### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
 - **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch

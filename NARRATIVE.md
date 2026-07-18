@@ -58,8 +58,17 @@ Each "why does RL lose?" hypothesis was killed by a specific number:
     PPO there too. **The exact failure signature from Act II (low reward, low utilization) is now
     reversed**: PPO's utilization is the highest of the three, not the lowest — it's running the fleet
     harder, not routing the same trips more cleverly. Same net. Same trainer. Same hyperparameters.
-    The only thing that changed was the traffic generator. **← we are here — one rung, one pattern, one
-    load point; the ladder continues before this becomes the headline.**
+    The only thing that changed was the traffic generator.
+13. **Rung S: a near three-way tie — and that's the expected result, not a setback.** Same recipe,
+    same pattern, retrained fresh on the small (3-car) fleet: LOOK, ETA, and PPO all land within ~0.8%
+    of each other on delivered/reward, and nobody abandons anyone — the small fleet has slack, so
+    dispatch quality barely moves the needle. PPO still shaves ~20% off tail wait (P95), but that's the
+    only lever left when everyone's served regardless. This is the project's own founding thesis talking:
+    RL was never expected to beat LOOK by much where LOOK is already near-optimal (small buildings);
+    the bet has always been that the edge appears at scale/constraint. **S as a tied control point makes
+    M's win more credible, not less — it isn't a rising tide lifting every rung.**
+    **← we are here — S confirms the easy case is a wash; L (bigger, more coordination-dependent fleet)
+    is the rung the thesis says should show the largest edge, and is next.**
 - **If it keeps winning — the tradeoffs.** Reward variants (longest-wait vs journey-time vs
   lobby-priority) — note ETA still wins mean wait here, so "RL wins" is already metric-dependent, which
   is exactly what the reward-tradeoff axis is for. And the money question: **is destination-dispatch

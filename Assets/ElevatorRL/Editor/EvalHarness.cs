@@ -515,6 +515,11 @@ namespace ElevatorRL.Editor
             "Assets/ElevatorRL/Models/elev-v2-m-midday-01.onnx", obsSize: 254,
             pattern: TrafficPattern.Midday, intensity: 1.0f);
 
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung S, midday, nominal load, new traffic)")]
+        static void RunV2SweepSMidday() => RunScaleLadderSweep("V2-S-midday", 8, 3, 8,
+            "Assets/ElevatorRL/Models/elev-v2-s-midday-01.onnx", obsSize: 98,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
         [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
         static void RunV0Rebaseline()
         {
