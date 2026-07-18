@@ -75,6 +75,12 @@ cp "$PROJECT_ROOT/Assets/ElevatorRL/Config/TrafficConfig.asset"     "$SNAP_DIR/c
 SCENE="$PROJECT_ROOT/Assets/Scenes/Training.unity"
 {
   echo "# What Assets/Scenes/Training.unity ACTUALLY references at launch time (guid -> asset)."
+  echo "# CAVEAT: if ENV_BUILD was pre-built earlier and the scene has since been re-pointed at a"
+  echo "# different rung/config (the batch pre-build-everything-then-train workflow), this block"
+  echo "# reflects the CURRENT scene, NOT necessarily what's baked into ENV_BUILD's binary. The"
+  echo "# reproducibility snapshot's BuildingConfig copy below is unaffected -- it uses the explicit"
+  echo "# preset-name arg, not live scene state -- but treat THIS printed block as informational only"
+  echo "# in that workflow, not as proof of what ENV_BUILD is running."
   for key in buildingConfig rewardConfig observationConfig trafficConfig; do
     guid=$(grep -m1 "  $key:" "$SCENE" | grep -oE 'guid: [0-9a-f]+' | awk '{print $2}')
     if [ -n "$guid" ]; then
