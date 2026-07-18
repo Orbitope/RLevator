@@ -30,6 +30,18 @@ killing your own hypothesis with a measurement over defending it.
 - **Editor work and 20-env training CANNOT overlap** — the Editor goes unresponsive under training
   load. Batch Editor work (rebuilds, menu evals) into training gaps; pause training if needed
   (checkpointed, `keep_checkpoints: 5`, resume via `scripts/resume_training.sh`).
+- **Unattended/solo execution: pre-build every environment BEFORE launching any training, then run
+  training back-to-back with zero further Editor interaction.** Training (`mlagents-learn` against an
+  already-built `.app`) never touches the Unity Editor — only *building* and *eval* do. The Editor also
+  tends to go unresponsive for long stretches when unattended, so don't interleave "point preset → save
+  → rebuild" with each training run; that serializes N training runs behind N Editor round-trips. Instead,
+  in one Editor-responsive window: for each rung/config needed, point the agent at its preset, save, and
+  build to a **per-rung path** (`Tools/Elevator RL/Build Headless Trainer - S/M/L/Z/H (macOS)` —
+  `Builds/HeadlessTrainer_{S,M,L,Z,H}/`, distinct from the shared default path so later builds don't
+  overwrite earlier ones). Then launch every training run in the batch, sequentially, purely via
+  `scripts/start_training.sh <run-id> <config> Builds/HeadlessTrainer_<rung>/RLevatorTrainer.app 20 <rung>`
+  — no Unity calls needed until the whole batch finishes. Only then batch the evals (each needs the
+  Editor, but back-to-back eval calls are minutes, not the hours training takes).
 - After a force-kill of the Editor, `rm -f Temp/UnityLockfile` before it can relaunch.
 - MCP-Unity calls (`recompile_scripts`, `execute_menu_item`) frequently **time out client-side but
   succeed server-side** — verify via `~/Library/Logs/Unity/Editor.log` (grep for the expected log

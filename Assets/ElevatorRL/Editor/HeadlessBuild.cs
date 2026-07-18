@@ -20,6 +20,27 @@ namespace ElevatorRL.Editor
         [MenuItem("Tools/Elevator RL/Build Headless Trainer (macOS)")]
         public static void Build() => BuildScene("Assets/Scenes/Training.unity", OutputPath);
 
+        // Per-rung persistent build paths — unlike the shared OutputPath above (which the next
+        // rung's rebuild silently overwrites), these let every rung's build coexist on disk so a
+        // whole batch of rungs can be pre-built in one Editor-responsive window, then trained
+        // back-to-back with zero further Editor interaction (mlagents-learn only needs the .app,
+        // not a live Editor). Point the agent at the matching preset + save the scene BEFORE
+        // calling each of these — the build bakes whatever BuildingConfig is currently wired.
+        [MenuItem("Tools/Elevator RL/Build Headless Trainer - S (macOS)")]
+        public static void BuildS() => BuildScene("Assets/Scenes/Training.unity", "Builds/HeadlessTrainer_S/RLevatorTrainer.app");
+
+        [MenuItem("Tools/Elevator RL/Build Headless Trainer - M (macOS)")]
+        public static void BuildM() => BuildScene("Assets/Scenes/Training.unity", "Builds/HeadlessTrainer_M/RLevatorTrainer.app");
+
+        [MenuItem("Tools/Elevator RL/Build Headless Trainer - L (macOS)")]
+        public static void BuildL() => BuildScene("Assets/Scenes/Training.unity", "Builds/HeadlessTrainer_L/RLevatorTrainer.app");
+
+        [MenuItem("Tools/Elevator RL/Build Headless Trainer - Z (macOS)")]
+        public static void BuildZ() => BuildScene("Assets/Scenes/Training.unity", "Builds/HeadlessTrainer_Z/RLevatorTrainer.app");
+
+        [MenuItem("Tools/Elevator RL/Build Headless Trainer - H (macOS)")]
+        public static void BuildH() => BuildScene("Assets/Scenes/Training.unity", "Builds/HeadlessTrainer_H/RLevatorTrainer.app");
+
         [MenuItem("Tools/Elevator RL/E6 Multi-Agent/Build Headless Trainer (macOS)")]
         public static void BuildMultiAgent() => BuildScene("Assets/Scenes/TrainingMultiAgent.unity", MultiAgentOutputPath);
 
