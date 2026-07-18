@@ -107,11 +107,18 @@ namespace ElevatorRL
                 float day = ep.GetWithDefault("use_day_cycle", -1f);
                 if (day >= 0f) _traffic.useDayCycle = day > 0.5f;
 
+                // V0/V2: nominal(1.0)/stress(1.5) load override, same override-the-clone mechanism as
+                // pattern/day-cycle above -- lets one build serve both load points without touching
+                // the shared TrafficConfig asset (which would silently change every other run/rung).
+                float intensity = ep.GetWithDefault("intensity", -1f);
+                if (intensity >= 0f) _traffic.intensity = intensity;
+
                 if (!_loggedTraffic)
                 {
                     _loggedTraffic = true;
                     Debug.Log($"[E12] traffic override active: pattern={_traffic.defaultPattern} " +
-                              $"useDayCycle={_traffic.useDayCycle} (env params traffic_pattern={pat}, use_day_cycle={day})");
+                              $"useDayCycle={_traffic.useDayCycle} intensity={_traffic.intensity} " +
+                              $"(env params traffic_pattern={pat}, use_day_cycle={day}, intensity={intensity})");
                 }
             }
 
