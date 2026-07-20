@@ -1,0 +1,153 @@
+{
+ "meta": {
+  "seeds": [
+   1,
+   2,
+   3,
+   4,
+   5
+  ],
+  "protocol": "3600 s episode, 300 s warmup, greedy + masked inference, means over seeds; identical traffic per seed across methods",
+  "generated": "2026-07-19",
+  "git": "c36de84"
+ },
+ "results": {
+  "S": {
+   "shaped": {
+    "LOOK": {
+     "throughput": 244.6,
+     "avgWait": 6.01,
+     "waitP95": 16.49,
+     "abandoned": 0.2,
+     "reward": 2482
+    },
+    "flat": {
+     "throughput": 245.2,
+     "avgWait": 5.85,
+     "waitP95": 16.17,
+     "abandoned": 0,
+     "reward": 2416
+    },
+    "D3QN": {
+     "throughput": 238.6,
+     "avgWait": 10.25,
+     "waitP95": 29.32,
+     "abandoned": 8.2,
+     "reward": 2116
+    }
+   },
+   "unshaped": {
+    "LOOK": {
+     "throughput": 244.6,
+     "avgWait": 6.01,
+     "waitP95": 16.49,
+     "abandoned": 0.2,
+     "reward": 2171
+    }
+   }
+  },
+  "M": {
+   "shaped": {
+    "LOOK": {
+     "throughput": 417.8,
+     "avgWait": 9.07,
+     "waitP95": 26.12,
+     "abandoned": 3.4,
+     "reward": 4469
+    },
+    "flat": {
+     "throughput": 421,
+     "avgWait": 7.5,
+     "waitP95": 21.07,
+     "abandoned": 0.8,
+     "reward": 4334
+    },
+    "conv": {
+     "throughput": 394.6,
+     "avgWait": 8.93,
+     "waitP95": 31.57,
+     "abandoned": 26.2,
+     "reward": 3729
+    },
+    "percar": {
+     "throughput": 415.8,
+     "avgWait": 8.9,
+     "waitP95": 27.0,
+     "abandoned": 5,
+     "reward": 4254
+    },
+    "attention": {
+     "throughput": 418,
+     "avgWait": 8.04,
+     "waitP95": 23.89,
+     "abandoned": 3.4,
+     "reward": 4463
+    }
+   },
+   "unshaped": {
+    "LOOK": {
+     "throughput": 417.8,
+     "avgWait": 9.07,
+     "waitP95": 26.12,
+     "abandoned": 3.4,
+     "reward": 3392
+    },
+    "flat": {
+     "throughput": 421.8,
+     "avgWait": 6.86,
+     "waitP95": 17.98,
+     "abandoned": 0,
+     "reward": 3336
+    },
+    "attention": {
+     "throughput": 416.6,
+     "avgWait": 8.7,
+     "waitP95": 26.86,
+     "abandoned": 4,
+     "reward": 3323
+    }
+   }
+  },
+  "L": {
+   "shaped": {
+    "LOOK": {
+     "throughput": 677.8,
+     "avgWait": 10.41,
+     "waitP95": 30.33,
+     "abandoned": 14.6,
+     "reward": 8267
+    },
+    "flat": {
+     "throughput": 665.2,
+     "avgWait": 9.45,
+     "waitP95": 28.45,
+     "abandoned": 19.8,
+     "reward": 6843
+    },
+    "attention": {
+     "throughput": 672.6,
+     "avgWait": 10.25,
+     "waitP95": 30.68,
+     "abandoned": 19.2,
+     "reward": 7909
+    }
+   },
+   "unshaped": {
+    "LOOK": {
+     "throughput": 677.8,
+     "avgWait": 10.41,
+     "waitP95": 30.33,
+     "abandoned": 14.6,
+     "reward": 4923
+    },
+    "flat": {
+     "throughput": 686.4,
+     "avgWait": 9.83,
+     "waitP95": 28.3,
+     "abandoned": 3,
+     "reward": 4416
+    }
+   }
+  }
+ }
+}

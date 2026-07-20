@@ -2058,6 +2058,40 @@ claim (RL beats LOOK at scale) is already cleanly shown at M/L via §9.3-§9.4.
   joint action forces VDN/QMIX factoring, or keep PPO's per-car heads which scale as-is), and
   **attribute the board-mask edge** at M.
 
+### 9.6 Article site (`docs/`) — static GitHub Pages build (2026-07-19)
+
+The public writeup: a scrollytelling article + interactive visualizations, served statically from
+`docs/` (enable Pages: deploy-from-branch, default branch, `/docs`). Built from the ContentKit
+`.dc.html` visualization package (companion deliverable), completed with prose (technical/
+structured register) and the real §9.3–9.4 results.
+
+- **What shipped.** `docs/index.html` = 6-scene scrolly (Background → Observation → Reward →
+  Architecture → Playground → Results) + a full-width technical tail (setup, training & eval
+  protocol, findings tables, limitations, what's-next/resources). Scenes: fact-checked Background
+  (Miconic 10 1990, Otis Elevonic/RSR 1979, Crites & Barto 1996 — RL card era corrected from
+  "2010s" to "1996 · now"); Results viz adapted to **building-size × reward selectors** fed by
+  `results.json`, which `sim/rlevator/make_results.py` REGENERATES from the saved checkpoints
+  (17 eval runs, seeds 1–5 — measured, not transcribed; regen is deterministic and matches §9.3/9.4).
+  Fully static: React/ReactDOM/Babel vendored into `docs/vendor/` (SRI-verified against the pinned
+  unpkg versions), zero third-party requests.
+- **Portability fixes made (kept minimal, documented here for the package's future use).**
+  (a) The three scroll-driven scenes indexed arrays by an unguarded `progress` prop — NaN/non-
+  numeric progress crashed renders (present in the author package's own article); guarded with
+  `Number.isFinite`. (b) The article shell was refactored from inner-scroller to window-scroll +
+  sticky stage so the technical tail can follow in normal flow; scenes now **mount progressively**
+  (on approach, then stay mounted) — six simultaneous streaming imports raced the dc-runtime.
+  (c) Scroll handling listens on window+document and falls back to a 250 ms scrollY poller with
+  direct compute (rAF starves in embedded/backgrounded viewers; innerHeight can be 0 — uses
+  clientHeight with an 800 px floor). (d) Arch-scene "flat breaks down at L" verdict corrected to
+  hypothesis framing (§9.3 disproved it).
+- **Verification.** Served locally; zero external requests; full JS walk: scene cross-fades track
+  scroll 0→5, progress drives Observation beats / Architecture stages, Results loads `results.json`
+  (badge MEASURED) with the per-cell method gaps as designed; standalone scene pages render
+  pixel-verified. Known cosmetic: the dc-runtime logs transient streaming-mount errors that it
+  recovers from — identical noise exists in the author's original article shell.
+- **Handles.** `docs/` (self-contained), `sim/rlevator/make_results.py` (data pipeline),
+  screenshots in the package for og-image (`docs/og.png`).
+
 ---
 
 ### Appendix — expectation calibration

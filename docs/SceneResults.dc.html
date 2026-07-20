@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    input[type=radio] { accent-color: var(--amber); }
+  </style>
+</helmet>
+<div data-screen-label="Results" style="display:flex;flex-direction:column;width:100%;height:100vh;min-height:640px;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:flex-start;justify-content:space-between;flex:0 0 auto;padding:16px 26px 14px;border-bottom:1px solid var(--border);">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">Results &#183; method comparison</span>
+        <span style="{{ placeholderBadge }}">{{ sourceLabel }}</span>
+      </div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--text-bright);margin-top:2px;">Which brain serves people best?</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;">
+      <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">best on {{ metricLabel }}</span>
+      <span style="font-family:var(--font-mono);font-size:16px;color:var(--amber-bright);margin-top:2px;">{{ winnerLabel }}</span>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+    <!-- controls -->
+    <aside style="width:250px;flex:0 0 auto;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 18px 6px;"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">metric</span></div>
+      <div style="display:flex;flex-direction:column;gap:2px;padding:6px 12px 14px;">
+        <sc-for list="{{ metricOpts }}" as="m" hint-placeholder-count="4"><button onClick="{{ m.onClick }}" style="{{ m.style }}">{{ m.label }}<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);margin-left:6px;">{{ m.dir }}</span></button></sc-for>
+      </div>
+      <div style="padding:8px 18px 6px;border-top:1px solid var(--border);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">building size</span></div>
+      <div style="display:flex;flex-direction:column;gap:2px;padding:6px 12px 14px;">
+        <sc-for list="{{ obsOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+      </div>
+      <div style="padding:8px 18px 6px;border-top:1px solid var(--border);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">reward</span></div>
+      <div style="display:flex;flex-direction:column;gap:2px;padding:6px 12px 14px;">
+        <sc-for list="{{ rewardOpts }}" as="r" hint-placeholder-count="2"><button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button></sc-for>
+      </div>
+      <div style="margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">protocol</div>
+        <div style="font-family:var(--font-body);font-size:11.5px;line-height:1.45;color:var(--text-muted);margin-top:5px;">{{ metaLabel }}</div>
+      </div>
+    </aside>
+
+    <!-- chart -->
+    <section style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 22px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">{{ metricLabel }} by method</span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">building: {{ obsLabel }} &#183; reward: {{ rewardLabel }}</span>
+      </div>
+      <div style="flex:1;min-height:0;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:10px;">
+        <svg viewBox="0 0 720 420" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5"><line x1="{{ g.x1 }}" y1="{{ g.y }}" x2="{{ g.x2 }}" y2="{{ g.y }}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 4"></line></sc-for>
+          <sc-for list="{{ baseline }}" as="b" hint-placeholder-count="0"><line x1="{{ b.x1 }}" y1="{{ b.y }}" x2="{{ b.x2 }}" y2="{{ b.y }}" stroke="var(--steel-bright)" stroke-width="1.5" stroke-dasharray="6 5"></line><text x="{{ b.tx }}" y="{{ b.ty }}" fill="var(--steel-bright)" font-family="var(--font-mono)" font-size="11" text-anchor="end">{{ b.label }}</text></sc-for>
+          <sc-for list="{{ bars }}" as="bar" hint-placeholder-count="5"><rect x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.w }}" height="{{ bar.h }}" rx="2" fill="{{ bar.fill }}"></rect><text x="{{ bar.cx }}" y="{{ bar.vy }}" fill="{{ bar.valColor }}" font-family="var(--font-mono)" font-size="13" text-anchor="middle">{{ bar.val }}</text><text x="{{ bar.cx }}" y="405" fill="{{ bar.labelColor }}" font-family="var(--font-mono)" font-size="11" text-anchor="middle">{{ bar.name }}</text></sc-for>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-body);font-size:12px;line-height:1.45;color:var(--text-muted);margin-top:9px;">{{ note }}</div>
+    </section>
+
+    <!-- table -->
+    <aside style="width:340px;flex:0 0 auto;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 18px 10px;"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">full table &#183; {{ obsLabel }} / {{ rewardLabel }}</span></div>
+      <div style="padding:0 14px 16px;">
+        <div style="display:grid;grid-template-columns:1.35fr 0.9fr 0.85fr 0.85fr 0.85fr 0.95fr;gap:0;font-family:var(--font-mono);">
+          <div style="{{ thStyle }}">method</div>
+          <div style="{{ thStyle }}">rew</div>
+          <div style="{{ thStyle }}">wait</div>
+          <div style="{{ thStyle }}">p95</div>
+          <div style="{{ thStyle }}">deliv</div>
+          <div style="{{ thStyle }}">aband</div>
+          <sc-for list="{{ tableCells }}" as="c" hint-placeholder-count="24"><div style="{{ c.style }}">{{ c.v }}</div></sc-for>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:800}}">
+class Component extends DCLogic {
+  // Display order + labels for method keys as they appear in results.json.
+  // Methods absent from a (building, reward) cell simply don't render there.
+  METHOD_ORDER = ['LOOK', 'flat', 'conv', 'percar', 'attention', 'D3QN'];
+  METHOD_LABEL = { LOOK: 'LOOK', flat: 'Flat MLP', conv: 'Conv', percar: 'Per-car', attention: 'Attention', D3QN: 'D3QN' };
+  METRICS = [
+    { key: 'avgWait', label: 'avg wait', dir: 'lower', better: -1, unit: 's' },
+    { key: 'waitP95', label: 'wait p95', dir: 'lower', better: -1, unit: 's' },
+    { key: 'throughput', label: 'delivered', dir: 'higher', better: 1, unit: '' },
+    { key: 'abandoned', label: 'abandoned', dir: 'lower', better: -1, unit: '' },
+    { key: 'reward', label: 'total reward', dir: 'higher', better: 1, unit: '' },
+  ];
+  OBS = [
+    { k: 'S', label: 'S \u00b7 8 fl / 3 cars' },
+    { k: 'M', label: 'M \u00b7 16 fl / 5 cars' },
+    { k: 'L', label: 'L \u00b7 30 fl / 8 cars' },
+  ];
+  REWARDS = [
+    { k: 'unshaped', label: 'Unshaped (final)' },
+    { k: 'shaped', label: 'Shaped (\u00b10.4 move)' },
+  ];
+
+  // Real measured data only \u2014 loaded from results.json generated by
+  // sim/rlevator/make_results.py (re-runs the evals from saved checkpoints).
+  state = { metric: 0, obs: 1, reward: 0, source: 'loading' };
+
+  RESULTS = null;
+  META = null;
+
+  componentDidMount() {
+    fetch('results.json').then((r) => r.ok ? r.json() : null).then((j) => {
+      if (j && j.results) {
+        this.RESULTS = j.results; this.META = j.meta || null;
+        this.setState({ source: 'live' });
+      } else { this.setState({ source: 'missing' }); }
+    }).catch(() => this.setState({ source: 'missing' }));
+  }
+
+  setMetric = (i) => this.setState({ metric: i });
+  setObs = (i) => this.setState({ obs: i });
+  setReward = (i) => this.setState({ reward: i });
+
+  renderVals() {
+    const obsKey = this.OBS[this.state.obs].k, rwKey = this.REWARDS[this.state.reward].k;
+    const cond = (this.RESULTS && this.RESULTS[obsKey] && this.RESULTS[obsKey][rwKey]) || {};
+    const methods = this.METHOD_ORDER.filter((m) => cond[m]);
+    const met = this.METRICS[this.state.metric];
+
+    const vals = methods.map((m) => ({ m, v: cond[m][met.key] }));
+    const maxV = vals.length ? Math.max(...vals.map((x) => x.v)) : 1;
+    const minV = vals.length ? Math.min(...vals.map((x) => x.v)) : 0;
+    // best method for this metric
+    const best = vals.length
+      ? vals.reduce((a, b) => (met.better > 0 ? b.v > a.v : b.v < a.v) ? b : a, vals[0])
+      : { m: null, v: 0 };
+
+    // chart geometry viewBox 720x420, baseline 0..380 plot
+    const X0 = 40, X1 = 700, Y0 = 34, Y1 = 380;
+    const n = Math.max(1, methods.length);
+    const slot = (X1 - X0) / n;
+    const bw = Math.min(slot * 0.5, 120);
+    const yAt = (v) => Y1 - ((v - Math.min(0, minV)) / (maxV - Math.min(0, minV) || 1)) * (Y1 - Y0);
+    const bars = vals.map((x, i) => {
+      const cx = X0 + slot * i + slot / 2;
+      const y = yAt(x.v);
+      const isBest = x.m === best.m;
+      const isBase = x.m === 'LOOK';
+      return {
+        key: x.m, x: cx - bw / 2, y, w: bw, h: Math.max(1, Y1 - y),
+        fill: isBase ? 'var(--steel)' : (isBest ? 'var(--amber)' : 'var(--data-2)'),
+        cx, vy: y - 8, val: x.v + met.unit, valColor: isBest ? 'var(--amber-bright)' : 'var(--text-secondary)',
+        name: this.METHOD_LABEL[x.m] || x.m, labelColor: isBest ? 'var(--text-bright)' : 'var(--text-muted)',
+      };
+    });
+    const gridLines = [0, 1, 2, 3, 4].map((t) => ({ key: t, x1: X0, x2: X1, y: (Y0 + t * (Y1 - Y0) / 4).toFixed(0) }));
+    const baseline = cond['LOOK'] ? [(() => {
+      const lookV = cond['LOOK'][met.key];
+      return { key: 'b', x1: X0, x2: X1, y: yAt(lookV).toFixed(1), tx: X1, ty: (yAt(lookV) - 5).toFixed(1), label: 'LOOK baseline' };
+    })()] : [];
+
+    // controls styling
+    const btn = (on) => ({ textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: '12px', padding: '8px 10px', borderRadius: '3px', cursor: 'pointer', border: '1px solid ' + (on ? 'var(--amber)' : 'transparent'), background: on ? 'var(--void)' : 'transparent', color: on ? 'var(--amber-bright)' : 'var(--text-secondary)' });
+    const metricOpts = this.METRICS.map((m, i) => ({ key: m.key, label: m.label, dir: m.dir, onClick: () => this.setMetric(i), style: btn(i === this.state.metric) }));
+    const obsOpts = this.OBS.map((o, i) => ({ key: o.k, label: o.label, onClick: () => this.setObs(i), style: btn(i === this.state.obs) }));
+    const rewardOpts = this.REWARDS.map((o, i) => ({ key: o.k, label: o.label, onClick: () => this.setReward(i), style: btn(i === this.state.reward) }));
+
+    // table (order: method, reward, avgWait, waitP95, throughput, abandoned)
+    const TABLE_COLS = ['reward', 'avgWait', 'waitP95', 'throughput', 'abandoned'];
+    const thStyle = { fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '6px 6px', borderBottom: '1px solid var(--border)' };
+    const bestPer = {};
+    for (const mm of this.METRICS) {
+      const arr = methods.map((m) => cond[m][mm.key]);
+      bestPer[mm.key] = arr.length ? (mm.better > 0 ? Math.max(...arr) : Math.min(...arr)) : null;
+    }
+    const betterOf = {}; this.METRICS.forEach((mm) => { betterOf[mm.key] = mm.better; });
+    const tableCells = [];
+    methods.forEach((m) => {
+      const cellBase = { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '7px 6px', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums' };
+      tableCells.push({ key: m + '_n', v: this.METHOD_LABEL[m] || m, style: { ...cellBase, color: 'var(--text-primary)' } });
+      TABLE_COLS.forEach((ck) => {
+        const v = cond[m][ck];
+        const isBest = v === bestPer[ck] && methods.length > 1;
+        tableCells.push({ key: m + '_' + ck, v: v, style: { ...cellBase, textAlign: 'right', color: isBest ? 'var(--amber-bright)' : 'var(--text-secondary)' } });
+      });
+    });
+
+    const src = this.state.source;
+    const metaLabel = this.META
+      ? this.META.protocol + ' \u00b7 seeds ' + (this.META.seeds || []).join(',') + (this.META.git ? ' \u00b7 ' + this.META.git : '')
+      : 'Measured results regenerated from the repo checkpoints by sim/rlevator/make_results.py.';
+    const noteBits = [];
+    if (src === 'live') {
+      noteBits.push('Measured runs (means over 5 seeds). Bars: amber = best on this metric, steel = LOOK baseline.');
+      if (methods.length <= 1) noteBits.push('Only the LOOK baseline was run for this configuration.');
+      else if (!cond['D3QN'] && obsKey !== 'S') noteBits.push('Cells show the methods actually trained under this configuration \u2014 the matrix has deliberate gaps.');
+    } else if (src === 'missing') {
+      noteBits.push('results.json not found \u2014 regenerate it with: python -m rlevator.make_results');
+    } else {
+      noteBits.push('Loading results\u2026');
+    }
+
+    return {
+      metricLabel: met.label, obsLabel: this.OBS[this.state.obs].label, rewardLabel: this.REWARDS[this.state.reward].label,
+      winnerLabel: best.m ? (this.METHOD_LABEL[best.m] || best.m) : '\u2014',
+      metricOpts, obsOpts, rewardOpts,
+      bars, gridLines, baseline, thStyle, tableCells, metaLabel,
+      sourceLabel: src === 'live' ? 'MEASURED' : (src === 'missing' ? 'NO DATA' : 'LOADING'),
+      placeholderBadge: { fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em', padding: '2px 7px', borderRadius: '3px', border: '1px solid ' + (src === 'live' ? 'var(--amber)' : 'var(--coral)'), color: src === 'live' ? 'var(--amber-bright)' : 'var(--coral-bright)', background: src === 'live' ? 'transparent' : 'var(--coral-wash)' },
+      note: noteBits.join(' '),
+    };
+  }
+}
+</script>
+</body>
+</html>

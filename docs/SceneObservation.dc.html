@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    @keyframes ckIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    @keyframes ckFade { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</helmet>
+<div data-screen-label="Observation" style="display:flex;flex-direction:column;width:100%;height:100vh;min-height:620px;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:flex-start;justify-content:space-between;flex:0 0 auto;padding:16px 26px 14px;border-bottom:1px solid var(--border);">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">Observation &#183; what the agent sees</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--text-bright);margin-top:2px;">{{ beatTitle }}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:20px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">block</span>
+        <span style="font-family:var(--font-mono);font-size:15px;color:var(--amber);margin-top:2px;">{{ beatBlock }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">shape</span>
+        <span style="font-family:var(--font-mono);font-size:15px;color:var(--text-primary);margin-top:2px;">{{ beatShape }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+    <!-- cross-section -->
+    <section data-obs-stage="1" style="flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden;">
+      <div style="{{ crossStyle }}">
+        <sc-for list="{{ floors }}" as="fl" hint-placeholder-count="16">
+          <div style="{{ fl.bandStyle }}">
+            <div style="{{ fl.gutterStyle }}">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);font-variant-numeric:tabular-nums;width:22px;text-align:right;">{{ fl.label }}</span>
+              <div style="display:flex;flex-direction:column;gap:2px;width:12px;align-items:center;">
+                <span style="{{ fl.upTriStyle }}">&#9650;</span>
+                <span style="{{ fl.downTriStyle }}">&#9660;</span>
+              </div>
+              <div style="{{ fl.waitersWrap }}">
+                <sc-for list="{{ fl.waiters }}" as="w" hint-placeholder-count="0"><span style="{{ w.style }}">{{ w.mark }}</span></sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="{{ shaftsStyle }}">
+          <sc-for list="{{ cars }}" as="c" hint-placeholder-count="5">
+            <div style="{{ c.shaftStyle }}">
+              <span style="{{ c.tagStyle }}">{{ c.tag }}</span>
+              <sc-for list="{{ c.destMarks }}" as="d" hint-placeholder-count="0"><div style="{{ d.style }}"></div></sc-for>
+              <div style="{{ c.carStyle }}">
+                <span style="{{ c.arrowStyle }}">{{ c.arrow }}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:var(--amber-bright);font-variant-numeric:tabular-nums;line-height:1;">{{ c.loadLabel }}</span>
+                <div style="{{ c.gaugeTrack }}"><div style="{{ c.gaugeFill }}"></div></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ showBlindfold }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ blindfoldStyle }}">
+            <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.1em;color:var(--coral-bright);">destinations of waiting people &#8594; unknown</span>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+
+    <!-- annotation rail -->
+    <aside style="width:300px;flex:0 0 auto;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
+        <div style="font-family:var(--font-body);font-size:14px;line-height:1.5;color:var(--text-secondary);">{{ beatNote }}</div>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">observation blocks</span>
+        <sc-for list="{{ blockList }}" as="b" hint-placeholder-count="7">
+          <div style="{{ b.rowStyle }}">
+            <span style="{{ b.dotStyle }}"></span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:{{ b.nameColor }};flex:1;">{{ b.name }}</span>
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">{{ b.shape }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--border);">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">the observation vector</div>
+        <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--amber-bright);font-variant-numeric:tabular-nums;margin-top:3px;">{{ vectorLen }} <span style="font-size:13px;color:var(--text-muted);font-family:var(--font-mono);font-weight:400;">floats &#183; size {{ sizeLabel }}</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+    <footer style="display:flex;align-items:center;gap:14px;flex:0 0 auto;padding:11px 22px;border-top:1px solid var(--border);background:var(--surface);">
+      <button onClick="{{ togglePlay }}" style="{{ playStyle }}">{{ playLabel }}</button>
+      <button onClick="{{ restart }}" style="{{ ctrlStyle }}">RESTART</button>
+      <div style="display:flex;gap:5px;flex:1;">
+        <sc-for list="{{ beatDots }}" as="d" hint-placeholder-count="10">
+          <button onClick="{{ d.onClick }}" title="{{ d.title }}" style="{{ d.style }}"></button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">size</span>
+        <sc-for list="{{ sizeTabs }}" as="s" hint-placeholder-count="3"><button onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button></sc-for>
+      </div>
+    </footer>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:820},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;M&quot;,&quot;options&quot;:[&quot;S&quot;,&quot;M&quot;,&quot;L&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Setup&quot;},&quot;progress&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Scrollytelling&quot;},&quot;captureMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Recording&quot;}}">
+class Component extends DCLogic {
+  SIZES = { S: { F: 8, E: 3 }, M: { F: 16, E: 5 }, L: { F: 30, E: 8 } };
+  MAXWAIT = 45;
+  BEATS = [
+    { title: 'A building the agent must run', block: '\u2014', shape: '', note: 'F floors, E elevator cars. Passengers arrive wanting to reach other floors. Every half-second the agent reads this picture and commands each car.' },
+    { title: 'Which floor each car is on', block: 'carFloor', shape: 'E \u00d7 F', note: 'A one-hot row per car marks its floor. Here it is simply each car\u2019s height in its shaft.' },
+    { title: 'Which cars are in service', block: 'carActive', shape: 'E', note: 'One bit per car. Out-of-service cars are greyed out and drop from the agent\u2019s control.' },
+    { title: 'Direction and fine position', block: 'carMotion', shape: '4 \u00d7 E', note: 'Each car\u2019s travel direction (down / idle / up) plus a smooth position between floors.' },
+    { title: 'How full each car is', block: 'carLoads', shape: 'E', note: 'Occupancy as riders / capacity \u2014 the fill gauge on each car.' },
+    { title: 'Where the riders want to go', block: 'carButtons', shape: 'E \u00d7 F', note: 'The destination buttons pressed inside each car light up on the floors its riders are headed to.' },
+    { title: 'Which floors are calling', block: 'hallButtons', shape: '2 \u00d7 F', note: 'An up-call and a down-call lamp beside every floor \u2014 someone is waiting there.' },
+    { title: 'How long they have waited', block: 'hallCallAge', shape: '2 \u00d7 F', note: 'The call lamps warm from steel to coral as the oldest waiter approaches the 45-second abandon limit.' },
+    { title: 'This picture is the observation', block: 'all blocks', shape: '', note: 'Everything the agent knows is on screen \u2014 and nothing else. Seven blocks, flattened into one vector of floats.' },
+    { title: 'What it cannot see', block: 'the blind spot', shape: '', note: 'The agent never learns where waiting people want to go \u2014 only that they are waiting, and for how long. It must infer demand from calls alone.' },
+  ];
+  BLOCK_KEYS = ['carFloor', 'carActive', 'carButtons', 'hallButtons', 'hallCallAge', 'carMotion', 'carLoads'];
+
+  state = { size: 'M', beat: 0, playing: true, floorH: 44 };
+
+  constructor(props) {
+    super(props);
+    if (props.size && this.SIZES[props.size]) this.state.size = props.size;
+    this.build();
+  }
+  componentDidMount() {
+    this.stageRef = document.querySelector('[data-obs-stage]');
+    this.ro = new ResizeObserver(() => this.measure());
+    if (this.stageRef) this.ro.observe(this.stageRef);
+    this.measure();
+    requestAnimationFrame(() => { this.measure(); requestAnimationFrame(() => this.measure()); });
+    this.simTimer = setInterval(() => { this.tick(); this.forceUpdate(); }, 420);
+    if (this.autoAllowed()) this.startAuto();
+    if (typeof window !== 'undefined') window.observationViz = { goToBeat: (n) => this.goTo(n), play: () => this.setState({ playing: true }, () => this.startAuto()), pause: () => this.pause() };
+  }
+  componentWillUnmount() { clearInterval(this.simTimer); clearInterval(this.autoTimer); if (this.ro) this.ro.disconnect(); }
+
+  autoAllowed() { return (this.props.progress == null) && this.state.playing; }
+  startAuto() { clearInterval(this.autoTimer); this.autoTimer = setInterval(() => {
+    this.setState((s) => ({ beat: Math.min(this.BEATS.length - 1, s.beat + 1) }), () => { if (this.state.beat >= this.BEATS.length - 1) this.pause(); });
+  }, 3600); }
+  pause() { clearInterval(this.autoTimer); this.setState({ playing: false }); }
+  togglePlay = () => { if (this.state.playing) this.pause(); else this.setState({ playing: true }, () => this.startAuto()); };
+  restart = () => this.setState({ beat: 0, playing: true }, () => { this.build(); this.startAuto(); });
+  goTo = (n) => { this.pause(); this.setState({ beat: Math.max(0, Math.min(this.BEATS.length - 1, n)) }); };
+  setSize = (k) => this.setState({ size: k }, () => { this.build(); this.measure(); this.forceUpdate(); });
+
+  measure = () => {
+    if (!this.stageRef) return;
+    const { F } = this.SIZES[this.state.size];
+    const h = this.stageRef.clientHeight - 40;
+    const fh = Math.max(20, Math.min(52, Math.floor(h / F)));
+    if (fh !== this.state.floorH) this.setState({ floorH: fh });
+  };
+
+  build() {
+    const { F, E } = this.SIZES[this.state.size];
+    this.pid = 0;
+    this.upQ = Array.from({ length: F }, () => []);
+    this.downQ = Array.from({ length: F }, () => []);
+    this.cars = Array.from({ length: E }, (_, i) => ({
+      id: i, floor: E > 1 ? Math.round(i * (F - 1) / (E - 1)) : 0,
+      riders: [], dir: 1, doorOpen: false, active: true,
+    }));
+    // one car off-duty in M/L to show carActive
+    if (E >= 4) this.cars[E - 1].active = false;
+    for (let w = 0; w < 6; w++) this.tick();
+  }
+
+  tick() {
+    const { F, E } = this.SIZES[this.state.size];
+    const cap = 6;
+    // arrivals (up-peak flavored)
+    for (let f = 0; f < F; f++) {
+      const lam = f === 0 ? 0.85 : 0.06;
+      if (Math.random() < lam) {
+        let d = f; while (d === f) d = Math.random() < (f === 0 ? 0.0 : 0.6) ? 0 : Math.floor(Math.random() * F);
+        const dir = d > f ? 1 : -1;
+        const q = dir > 0 ? this.upQ[f] : this.downQ[f];
+        if (q.length < 8) q.push({ id: this.pid++, dest: d, wait: 0 });
+      }
+    }
+    for (let f = 0; f < F; f++) for (const q of [this.upQ[f], this.downQ[f]]) {
+      for (let i = q.length - 1; i >= 0; i--) { q[i].wait += 1; if (q[i].wait > this.MAXWAIT + 6) q.splice(i, 1); }
+    }
+    // simple LOOK dispatch
+    for (const el of this.cars) {
+      if (!el.active) { el.doorOpen = false; continue; }
+      el.doorOpen = false;
+      const f = el.floor;
+      if (el.riders.some((p) => p.dest === f)) { el.riders = el.riders.filter((p) => p.dest !== f); el.doorOpen = true; continue; }
+      if (el.riders.length < cap && el.dir > 0 && this.upQ[f].length) { while (el.riders.length < cap && this.upQ[f].length) el.riders.push(this.upQ[f].shift()); el.doorOpen = true; continue; }
+      if (el.riders.length < cap && el.dir < 0 && this.downQ[f].length) { while (el.riders.length < cap && this.downQ[f].length) el.riders.push(this.downQ[f].shift()); el.doorOpen = true; continue; }
+      let target = null;
+      if (el.riders.length) { target = el.riders.reduce((b, p) => Math.abs(p.dest - f) < Math.abs(b - f) ? p.dest : b, el.riders[0].dest); }
+      else {
+        let bd = 1e9;
+        for (let g = 0; g < F; g++) if (this.upQ[g].length || this.downQ[g].length) { const dd = Math.abs(g - f); if (dd < bd) { bd = dd; target = g; } }
+        if (target === f && (this.upQ[f].length || this.downQ[f].length)) { el.doorOpen = true; if (this.upQ[f].length) { while (el.riders.length < cap && this.upQ[f].length) el.riders.push(this.upQ[f].shift()); el.dir = 1; } else { while (el.riders.length < cap && this.downQ[f].length) el.riders.push(this.downQ[f].shift()); el.dir = -1; } continue; }
+      }
+      if (target == null) continue;
+      if (target > f) { el.floor++; el.dir = 1; } else if (target < f) { el.floor--; el.dir = -1; }
+    }
+  }
+
+  ageColor(frac) {
+    // steel(cool) -> amber -> coral(hot)
+    if (frac < 0.5) { const t = frac / 0.5; return this.mix([107, 122, 141], [196, 154, 60], t); }
+    const t = (frac - 0.5) / 0.5; return this.mix([196, 154, 60], [255, 94, 58], t);
+  }
+  mix(a, b, t) { return 'rgb(' + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',') + ')'; }
+
+  renderVals() {
+    const { F, E } = this.SIZES[this.state.size];
+    const fh = this.state.floorH;
+    let beat = this.state.beat;
+    if (this.props.progress != null && Number.isFinite(+this.props.progress)) beat = Math.round(Math.max(0, Math.min(1, +this.props.progress)) * (this.BEATS.length - 1));
+    const B = this.BEATS[beat];
+
+    const rev = {
+      floorHi: beat >= 1, active: beat >= 2, motion: beat >= 3, loads: beat >= 4,
+      buttons: beat >= 5, hall: beat >= 6, age: beat >= 7, blind: beat === 9,
+    };
+
+    const innerW = 130 + E * 66 + (E - 1) * 22;
+    const innerH = F * fh;
+    const shaftsLeft = 130;
+
+    const floors = [];
+    for (let f = F - 1; f >= 0; f--) {
+      const top = (F - 1 - f) * fh;
+      const up = this.upQ[f], dn = this.downQ[f];
+      const upAge = up.length ? Math.min(1, Math.max(...up.map((p) => p.wait)) / this.MAXWAIT) : 0;
+      const dnAge = dn.length ? Math.min(1, Math.max(...dn.map((p) => p.wait)) / this.MAXWAIT) : 0;
+      const triColor = (has, age) => {
+        if (!rev.hall || !has) return 'var(--text-muted)';
+        return rev.age ? this.ageColor(age) : 'var(--amber)';
+      };
+      const triOpacity = (has) => (rev.hall && has) ? 1 : 0.12;
+      const waiters = (rev.hall ? [...up, ...dn] : []).slice(0, 8).map((p) => {
+        const age = Math.min(1, p.wait / this.MAXWAIT);
+        return { key: p.id, mark: rev.blind ? '?' : '\u2022',
+          style: { fontFamily: 'var(--font-mono)', fontSize: rev.blind ? '10px' : '13px', lineHeight: 1,
+            color: rev.age ? this.ageColor(age) : 'var(--steel-bright)' } };
+      });
+      floors.push({
+        key: f, label: f === 0 ? 'G' : String(f),
+        bandStyle: { position: 'absolute', left: 0, right: 0, top: top + 'px', height: fh + 'px', borderTop: '1px solid var(--border)' },
+        gutterStyle: { position: 'absolute', left: 0, top: 0, bottom: 0, width: shaftsLeft + 'px', display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '4px' },
+        upTriStyle: { fontSize: '8px', lineHeight: 1, color: triColor(up.length > 0, upAge), opacity: triOpacity(up.length > 0), transition: 'color 300ms, opacity 300ms' },
+        downTriStyle: { fontSize: '8px', lineHeight: 1, color: triColor(dn.length > 0, dnAge), opacity: triOpacity(dn.length > 0), transition: 'color 300ms, opacity 300ms' },
+        waitersWrap: { display: 'flex', gap: '2px', alignItems: 'center', flexWrap: 'nowrap', overflow: 'hidden', opacity: rev.hall ? 1 : 0, transition: 'opacity 300ms' },
+        waiters,
+      });
+    }
+
+    const cars = this.cars.map((el) => {
+      const carTop = (F - 1 - el.floor) * fh + 3;
+      const off = rev.active && !el.active;
+      const destMarks = (rev.buttons && !off) ? [...new Set(el.riders.map((p) => p.dest))].map((d) => ({
+        key: d, style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: ((F - 1 - d) * fh + fh / 2 - 2) + 'px', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--amber)', boxShadow: '0 0 5px rgba(232,192,104,0.55)', opacity: 0.85 } })) : [];
+      const loadFrac = el.riders.length / 6;
+      return {
+        key: el.id, tag: 'E' + el.id,
+        tagStyle: { position: 'absolute', top: '-16px', left: 0, right: 0, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', color: off ? 'var(--text-muted)' : 'var(--text-secondary)' },
+        shaftStyle: { position: 'relative', width: '66px', height: innerH + 'px', background: off ? 'var(--void)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', opacity: off ? 0.4 : 1, transition: 'opacity 300ms', backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent ' + (fh - 1) + 'px, var(--border) ' + (fh - 1) + 'px, var(--border) ' + fh + 'px)' },
+        destMarks,
+        carStyle: { position: 'absolute', left: '4px', right: '4px', top: carTop + 'px', height: (fh - 6) + 'px', background: off ? 'var(--raised)' : 'var(--raised)', border: '1px solid ' + (off ? 'var(--border)' : (el.doorOpen ? 'var(--amber-bright)' : 'var(--amber)')), borderRadius: '3px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', boxShadow: (!off && el.doorOpen) ? '0 0 12px rgba(232,192,104,0.3)' : 'none', filter: off ? 'grayscale(1)' : 'none', transition: 'top 380ms cubic-bezier(0.33,0,0.2,1), border-color 200ms, box-shadow 200ms', overflow: 'hidden' },
+        arrow: el.dir > 0 ? '\u25B2' : '\u25BC',
+        arrowStyle: { fontSize: '8px', lineHeight: 1, color: off ? 'var(--text-muted)' : (el.dir > 0 ? 'var(--amber)' : 'var(--steel-bright)'), opacity: rev.motion && !off ? 1 : 0, transition: 'opacity 300ms' },
+        loadLabel: off ? 'off' : (el.riders.length + '/6'),
+        gaugeTrack: { width: '70%', height: '3px', background: 'var(--void)', borderRadius: '2px', overflow: 'hidden', opacity: rev.loads && !off ? 1 : 0, transition: 'opacity 300ms' },
+        gaugeFill: { height: '100%', width: (loadFrac * 100) + '%', background: 'var(--amber)', transition: 'width 300ms' },
+      };
+    });
+
+    // block list highlight
+    const activeKey = B.block;
+    const shapeFor = { carFloor: 'E\u00d7F', carActive: 'E', carButtons: 'E\u00d7F', hallButtons: '2\u00d7F', hallCallAge: '2\u00d7F', carMotion: '4\u00d7E', carLoads: 'E' };
+    const blockList = this.BLOCK_KEYS.map((k) => {
+      const on = k === activeKey || activeKey === 'all blocks';
+      return { key: k, name: k, shape: shapeFor[k],
+        nameColor: on ? 'var(--text-bright)' : 'var(--text-muted)',
+        dotStyle: { width: '7px', height: '7px', borderRadius: '2px', background: on ? 'var(--amber)' : 'var(--border)', flex: '0 0 auto' },
+        rowStyle: { display: 'flex', alignItems: 'center', gap: '9px', padding: '6px 0', borderBottom: '1px solid var(--border)', opacity: on ? 1 : 0.5, transition: 'opacity 250ms' } };
+    });
+
+    const vlen = { S: 98, M: 254, L: 648 }[this.state.size];
+
+    // controls
+    const ctrlStyle = { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', padding: '7px 11px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-secondary)' };
+    const playStyle = { ...ctrlStyle, minWidth: '64px', background: this.state.playing ? 'var(--raised)' : 'var(--amber)', color: this.state.playing ? 'var(--amber-bright)' : 'var(--void)', borderColor: 'var(--amber)', fontWeight: this.state.playing ? 400 : 600 };
+    const beatDots = this.BEATS.map((bb, i) => ({ key: i, title: bb.title, onClick: () => this.goTo(i),
+      style: { flex: 1, height: '6px', borderRadius: '3px', cursor: 'pointer', border: 'none', padding: 0, background: i === beat ? 'var(--amber)' : (i < beat ? 'var(--amber)' : 'var(--border)'), opacity: i === beat ? 1 : (i < beat ? 0.5 : 1), transition: 'opacity 200ms, background 200ms' } }));
+    const sizeTabs = Object.keys(this.SIZES).map((k) => ({ key: k, label: k, onClick: () => this.setSize(k),
+      style: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', border: '1px solid ' + (this.state.size === k ? 'var(--amber)' : 'var(--border)'), background: this.state.size === k ? 'var(--void)' : 'var(--raised)', color: this.state.size === k ? 'var(--amber-bright)' : 'var(--text-muted)' } }));
+
+    return {
+      beatTitle: B.title, beatBlock: B.block, beatShape: B.shape, beatNote: B.note,
+      crossStyle: { position: 'relative', width: innerW + 'px', height: innerH + 'px' },
+      shaftsStyle: { position: 'absolute', left: shaftsLeft + 'px', top: 0, height: innerH + 'px', display: 'flex', gap: '22px' },
+      floors, cars, blockList, vectorLen: vlen, sizeLabel: this.state.size,
+      showBlindfold: rev.blind,
+      blindfoldStyle: { position: 'absolute', left: shaftsLeft + 'px', right: 0, bottom: '-2px', padding: '6px 10px', textAlign: 'center', animation: 'ckFade 400ms ease both' },
+      togglePlay: this.togglePlay, restart: this.restart, playLabel: this.state.playing ? 'PAUSE' : 'PLAY',
+      playStyle, ctrlStyle, beatDots, sizeTabs,
+      showRail: !(this.props.captureMode ?? false) && this.props.progress == null,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    input[type=range] { -webkit-appearance: none; appearance: none; height: 3px; background: var(--border); border-radius: 2px; outline: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); cursor: pointer; border: 2px solid var(--void); }
+    input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--amber); cursor: pointer; border: 2px solid var(--void); }
+    @keyframes ckPop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+  </style>
+</helmet>
+<div data-screen-label="Reward Playground" style="display:flex;flex-direction:column;width:100%;height:100vh;min-height:660px;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;padding:16px 24px;border-bottom:1px solid var(--border);">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">Reward Playground</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:23px;color:var(--text-bright);margin-top:2px;">The coefficients decide what &ldquo;good&rdquo; means</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:22px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">winning scenario</span>
+        <span style="font-family:var(--font-mono);font-size:16px;color:{{ winnerColor }};margin-top:2px;">{{ winnerLabel }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">its score</span>
+        <span style="font-family:var(--font-display);font-weight:600;font-size:26px;color:var(--amber-bright);font-variant-numeric:tabular-nums;line-height:1;margin-top:2px;">{{ winnerScore }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+
+    <!-- LEFT: coefficient controls -->
+    <aside style="width:290px;flex:0 0 auto;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 18px 10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">reward coefficients</span>
+        <button onClick="{{ resetCoeffs }}" style="{{ miniBtn }}" style-hover="{{ miniBtnHover }}">RESET</button>
+      </div>
+      <div style="display:flex;gap:6px;padding:0 18px 12px;flex-wrap:wrap;">
+        <sc-for list="{{ presets }}" as="p" hint-placeholder-count="4">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}" style-hover="{{ miniBtnHover }}">{{ p.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;padding:4px 18px 20px;">
+        <sc-for list="{{ coeffRows }}" as="c" hint-placeholder-count="7">
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="{{ c.dotStyle }}"></span><span style="font-family:var(--font-mono);font-size:12px;color:var(--text-primary);">{{ c.label }}</span></span>
+              <span style="font-family:var(--font-mono);font-size:12px;color:{{ c.valColor }};font-variant-numeric:tabular-nums;">{{ c.valueLabel }}</span>
+            </div>
+            <input type="range" min="{{ c.min }}" max="{{ c.max }}" step="{{ c.step }}" value="{{ c.value }}" onInput="{{ c.onChange }}" style="width:100%;" />
+            <div style="font-family:var(--font-body);font-size:11px;line-height:1.35;color:var(--text-muted);margin-top:5px;">{{ c.hint }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+
+    <!-- CENTER: cumulative reward chart -->
+    <section style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">cumulative reward over one episode</span>
+        <div style="display:flex;gap:6px;">
+          <sc-for list="{{ scenarioTabs }}" as="t" hint-placeholder-count="5">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}"><span style="{{ t.dotStyle }}"></span>{{ t.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:8px;">
+        <svg viewBox="0 0 900 440" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5"><line x1="{{ g.x1 }}" y1="{{ g.y1 }}" x2="{{ g.x2 }}" y2="{{ g.y2 }}" stroke="{{ g.stroke }}" stroke-width="{{ g.w }}" stroke-dasharray="{{ g.dash }}"></line></sc-for>
+          <sc-for list="{{ yTicks }}" as="t" hint-placeholder-count="5"><text x="{{ t.x }}" y="{{ t.y }}" fill="#6A6358" font-family="var(--font-mono)" font-size="12" text-anchor="end">{{ t.label }}</text></sc-for>
+          <sc-for list="{{ xTicks }}" as="t" hint-placeholder-count="6"><text x="{{ t.x }}" y="{{ t.y }}" fill="#6A6358" font-family="var(--font-mono)" font-size="12" text-anchor="middle">{{ t.label }}</text></sc-for>
+          <sc-for list="{{ chartLines }}" as="l" hint-placeholder-count="5"><path d="{{ l.path }}" fill="none" stroke="{{ l.color }}" stroke-width="{{ l.width }}" stroke-opacity="{{ l.opacity }}" stroke-linejoin="round"></path></sc-for>
+          <sc-for list="{{ endDots }}" as="d" hint-placeholder-count="5"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="{{ d.r }}" fill="{{ d.color }}" fill-opacity="{{ d.opacity }}"></circle></sc-for>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-body);font-size:12px;line-height:1.4;color:var(--text-secondary);margin-top:10px;max-width:70ch;">{{ selectedDesc }}</div>
+    </section>
+
+    <!-- RIGHT: term breakdown + leaderboard -->
+    <aside style="width:314px;flex:0 0 auto;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 18px 8px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">where the score comes from</span>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);margin-top:3px;"><span style="color:{{ selectedColor }};">&#9679;</span> {{ selectedLabel }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;padding:8px 18px 16px;border-bottom:1px solid var(--border);">
+        <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="7">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-secondary);width:74px;flex:0 0 auto;">{{ b.label }}</span>
+            <div style="flex:1;height:14px;position:relative;background:var(--void);border-radius:2px;overflow:hidden;">
+              <div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--border);"></div>
+              <div style="{{ b.barStyle }}"></div>
+            </div>
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:{{ b.valColor }};font-variant-numeric:tabular-nums;width:52px;text-align:right;flex:0 0 auto;">{{ b.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:14px 18px 8px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">leaderboard &#183; final score</span>
+      </div>
+      <div style="display:flex;flex-direction:column;padding:0 18px 20px;">
+        <sc-for list="{{ leaderboard }}" as="r" hint-placeholder-count="5">
+          <div style="{{ r.rowStyle }}">
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);width:16px;">{{ r.rank }}</span>
+            <span style="{{ r.dotStyle }}"></span>
+            <span style="font-family:var(--font-mono);font-size:12.5px;color:{{ r.labelColor }};flex:1;">{{ r.label }}</span>
+            <span style="font-family:var(--font-mono);font-size:12.5px;color:{{ r.scoreColor }};font-variant-numeric:tabular-nums;">{{ r.score }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ showHelp }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);font-family:var(--font-body);font-size:11px;line-height:1.45;color:var(--text-muted);">Drag a coefficient and watch the curves and the leaderboard reorder. The reward function is just these seven numbers &mdash; change them and you change which behaviour the agent is told to prefer.</div>
+      </sc-if>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:820},&quot;scenario&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;min&quot;:0,&quot;max&quot;:4,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Setup&quot;},&quot;compareAll&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Setup&quot;},&quot;captureMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Recording&quot;}}">
+class Component extends DCLogic {
+  DEFAULTS = { delivered: 10, toward: 0.4, away: -0.4, abandoned: -8, rejected: -5, inElevator: -0.04, inQueue: -0.12 };
+
+  COEFF_META = [
+    { key: 'delivered', label: 'delivered', min: 0, max: 20, step: 0.5, sign: 1, hint: 'The prize: a passenger dropped at their destination.' },
+    { key: 'toward', label: 'moved toward', min: 0, max: 2, step: 0.05, sign: 1, hint: 'Gentle nudge: a loaded car moving the right way.' },
+    { key: 'away', label: 'moved away', min: -2, max: 0, step: 0.05, sign: -1, hint: 'Gentle penalty: carrying riders the wrong way.' },
+    { key: 'abandoned', label: 'abandoned', min: -20, max: 0, step: 0.5, sign: -1, hint: 'Catastrophic: someone waited past 45s and gave up.' },
+    { key: 'rejected', label: 'rejected', min: -20, max: 0, step: 0.5, sign: -1, hint: 'Bad: an arrival turned away by a full queue.' },
+    { key: 'inElevator', label: 'in elevator', min: -0.3, max: 0, step: 0.01, sign: -1, hint: 'Per rider-second riding. The smaller drain.' },
+    { key: 'inQueue', label: 'in queue', min: -0.5, max: 0, step: 0.01, sign: -1, hint: 'Per person-second waiting in the hall — 3x the ride cost.' },
+  ];
+
+  PRESETS = {
+    Default: { ...this.DEFAULTS },
+    Throughput: { delivered: 15, toward: 0.2, away: -0.1, abandoned: -1, rejected: -1, inElevator: 0, inQueue: -0.01 },
+    'Anti-wait': { delivered: 10, toward: 0.4, away: -0.4, abandoned: -16, rejected: -10, inElevator: -0.02, inQueue: -0.45 },
+    Efficient: { delivered: 8, toward: 0.6, away: -0.6, abandoned: -8, rejected: -5, inElevator: -0.12, inQueue: -0.16 },
+  };
+
+  SERIES_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)'];
+  RAW_COLORS = ['#C49A3C', '#6B7A8D', '#7D9A6A', '#9A7AB0', '#C47A5A'];
+  N = 120;
+
+  state = { coeffs: { ...this.DEFAULTS }, selected: 0, activePreset: 'Default' };
+
+  constructor(props) {
+    super(props);
+    if (props.scenario != null) this.state.selected = props.scenario | 0;
+    this.scenarios = this.buildScenarios();
+  }
+
+  rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+  buildScenarios() {
+    // Each scenario is a per-decision event stream. Archetypes are shaped so that
+    // changing coefficients visibly reorders the leaderboard.
+    const N = this.N;
+    const defs = [
+      { id: 'balanced', label: 'Balanced', color: this.RAW_COLORS[0], seed: 11,
+        desc: 'A competent policy: steady deliveries, cars kept moving the right way, queues drained before anyone abandons. Wins under the default weights.',
+        rate: { del: 0.55, tw: 1.4, aw: 0.25, ab: 0.004, rj: 0.002, inEl: 6, inQ: 4 } },
+      { id: 'greedy', label: 'Hoarder', color: this.RAW_COLORS[1], seed: 23,
+        desc: 'Fills cars to the brim before moving, so occupancy is high and pickups are slow. Deliveries come in bursts; a few people abandon.',
+        rate: { del: 0.5, tw: 1.1, aw: 0.4, ab: 0.03, rj: 0.01, inEl: 11, inQ: 9 } },
+      { id: 'overflow', label: 'Overflow', color: this.RAW_COLORS[2], seed: 37,
+        desc: 'Traffic outruns capacity: queues saturate, arrivals get rejected and long-waiters abandon. Delivers a lot but bleeds from the failure terms.',
+        rate: { del: 0.62, tw: 1.3, aw: 0.35, ab: 0.09, rj: 0.11, inEl: 9, inQ: 16 } },
+      { id: 'timid', label: 'Timid', color: this.RAW_COLORS[3], seed: 51,
+        desc: 'Barely moves the cars. Almost nobody is carried the wrong way, but people pile up in the halls and wait forever.',
+        rate: { del: 0.22, tw: 0.5, aw: 0.08, ab: 0.05, rj: 0.03, inEl: 2, inQ: 14 } },
+      { id: 'thrash', label: 'Thrasher', color: this.RAW_COLORS[4], seed: 67,
+        desc: 'Constant motion with poor direction — lots of moved-toward but nearly as much moved-away. Moderate deliveries at wasteful cost.',
+        rate: { del: 0.48, tw: 2.6, aw: 2.2, ab: 0.01, rj: 0.006, inEl: 7, inQ: 6 } },
+    ];
+    return defs.map((d) => {
+      const r = this.rng(d.seed); const ev = [];
+      for (let i = 0; i < N; i++) {
+        const ramp = d.id === 'overflow' ? Math.min(1, i / 45) : 1;   // congestion builds
+        const warm = Math.min(1, i / 8);
+        const pois = (m) => { let L = Math.exp(-m), k = 0, p = 1; do { k++; p *= r(); } while (p > L); return k - 1; };
+        ev.push({
+          del: pois(d.rate.del * warm),
+          tw: d.rate.tw * (0.6 + 0.8 * r()),
+          aw: d.rate.aw * (0.6 + 0.8 * r()),
+          ab: pois(d.rate.ab * ramp * 4) ,
+          rj: pois(d.rate.rj * ramp * 4),
+          inEl: Math.max(0, d.rate.inEl * warm * (0.8 + 0.4 * r())),
+          inQ: Math.max(0, d.rate.inQ * ramp * (0.8 + 0.4 * r())),
+        });
+      }
+      return { ...d, ev };
+    });
+  }
+
+  seriesReward(sc, c) {
+    let cum = 0; const out = new Array(this.N);
+    for (let i = 0; i < this.N; i++) {
+      const e = sc.ev[i];
+      const step = c.delivered * e.del + c.toward * e.tw + c.away * e.aw
+        + c.abandoned * e.ab + c.rejected * e.rj + c.inElevator * e.inEl + c.inQueue * e.inQ;
+      cum += step; out[i] = cum;
+    }
+    return out;
+  }
+
+  termTotals(sc) {
+    const t = { del: 0, tw: 0, aw: 0, ab: 0, rj: 0, inEl: 0, inQ: 0 };
+    for (const e of sc.ev) { t.del += e.del; t.tw += e.tw; t.aw += e.aw; t.ab += e.ab; t.rj += e.rj; t.inEl += e.inEl; t.inQ += e.inQ; }
+    return t;
+  }
+
+  setCoeff = (key, v) => this.setState((s) => ({ coeffs: { ...s.coeffs, [key]: v }, activePreset: null }));
+  resetCoeffs = () => this.setState({ coeffs: { ...this.DEFAULTS }, activePreset: 'Default' });
+  applyPreset = (name) => this.setState({ coeffs: { ...this.PRESETS[name] }, activePreset: name });
+  selectScenario = (i) => this.setState({ selected: i });
+
+  renderVals() {
+    const c = this.state.coeffs;
+    const series = this.scenarios.map((sc) => this.seriesReward(sc, c));
+    const finals = series.map((s) => s[s.length - 1]);
+
+    // chart geometry (viewBox 0 0 900 440)
+    const X0 = 62, X1 = 884, Y0 = 14, Y1 = 410;
+    let lo = Math.min(0, ...finals.map((_, i) => Math.min(...series[i])));
+    let hi = Math.max(0, ...series.map((s) => Math.max(...s)));
+    if (hi === lo) hi = lo + 1;
+    const pad = (hi - lo) * 0.08; hi += pad; lo -= pad;
+    const xAt = (i) => X0 + (i / (this.N - 1)) * (X1 - X0);
+    const yAt = (v) => Y1 - ((v - lo) / (hi - lo)) * (Y1 - Y0);
+
+    const showAll = (this.props.compareAll ?? true);
+    const chartLines = series.map((s, i) => {
+      let d = 'M ' + xAt(0).toFixed(1) + ' ' + yAt(s[0]).toFixed(1);
+      for (let k = 1; k < s.length; k++) d += ' L ' + xAt(k).toFixed(1) + ' ' + yAt(s[k]).toFixed(1);
+      const sel = i === this.state.selected;
+      return { key: i, path: d, color: this.scenarios[i].color, width: sel ? 3 : 1.5, opacity: sel ? 1 : (showAll ? 0.34 : 0) };
+    });
+    const endDots = series.map((s, i) => {
+      const sel = i === this.state.selected;
+      return { key: i, x: xAt(this.N - 1).toFixed(1), y: yAt(s[s.length - 1]).toFixed(1), r: sel ? 4 : 3, color: this.scenarios[i].color, opacity: sel ? 1 : (showAll ? 0.34 : 0) };
+    });
+
+    // gridlines + ticks
+    const gridLines = []; const yTicks = [];
+    const NT = 4;
+    for (let t = 0; t <= NT; t++) {
+      const v = lo + (t / NT) * (hi - lo); const y = yAt(v);
+      const isZero = Math.abs(v) < (hi - lo) / 200;
+      gridLines.push({ key: 't' + t, x1: X0, y1: y.toFixed(1), x2: X1, y2: y.toFixed(1), stroke: isZero ? 'var(--text-muted)' : 'var(--border)', w: isZero ? 1 : 1, dash: isZero ? '0' : '3 4' });
+      yTicks.push({ key: 'y' + t, x: X0 - 8, y: (y + 4).toFixed(1), label: Math.round(v) });
+    }
+    const xTicks = [];
+    for (let s = 0; s <= this.N; s += 20) xTicks.push({ key: 'x' + s, x: xAt(s).toFixed(1), y: 428, label: s });
+
+    // scenario tabs
+    const tabBase = { display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '5px 9px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)' };
+    const scenarioTabs = this.scenarios.map((sc, i) => ({
+      key: i, label: sc.label, onClick: () => this.selectScenario(i),
+      dotStyle: { width: '8px', height: '8px', borderRadius: '50%', background: sc.color, flex: '0 0 auto' },
+      style: i === this.state.selected
+        ? { ...tabBase, borderColor: sc.color, color: 'var(--text-bright)', background: 'var(--void)' }
+        : { ...tabBase, color: 'var(--text-muted)' },
+    }));
+
+    // coefficient rows
+    const coeffRows = this.COEFF_META.map((m) => {
+      const v = c[m.key];
+      return {
+        key: m.key, label: m.label, min: m.min, max: m.max, step: m.step, value: v,
+        valueLabel: (v > 0 ? '+' : '') + (Math.abs(v) < 1 ? v.toFixed(2) : v.toFixed(1)),
+        valColor: m.sign > 0 ? 'var(--amber)' : 'var(--steel-bright)',
+        dotStyle: { width: '7px', height: '7px', borderRadius: '2px', background: m.sign > 0 ? 'var(--amber)' : (m.key === 'abandoned' ? 'var(--coral)' : 'var(--steel)') },
+        hint: m.hint,
+        onChange: (e) => this.setCoeff(m.key, +e.target.value),
+      };
+    });
+
+    // presets
+    const presetBase = { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.06em', padding: '5px 8px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-secondary)' };
+    const presets = Object.keys(this.PRESETS).map((name) => ({
+      key: name, label: name, onClick: () => this.applyPreset(name),
+      style: this.state.activePreset === name ? { ...presetBase, borderColor: 'var(--amber)', color: 'var(--amber-bright)' } : presetBase,
+    }));
+
+    // breakdown for selected scenario
+    const sc = this.scenarios[this.state.selected];
+    const tt = this.termTotals(sc);
+    const contribs = [
+      { label: 'delivered', v: c.delivered * tt.del, pos: true },
+      { label: 'moved toward', v: c.toward * tt.tw, pos: true },
+      { label: 'moved away', v: c.away * tt.aw, pos: false },
+      { label: 'abandoned', v: c.abandoned * tt.ab, pos: false, coral: true },
+      { label: 'rejected', v: c.rejected * tt.rj, pos: false },
+      { label: 'in elevator', v: c.inElevator * tt.inEl, pos: false },
+      { label: 'in queue', v: c.inQueue * tt.inQ, pos: false },
+    ];
+    const maxAbs = Math.max(1, ...contribs.map((x) => Math.abs(x.v)));
+    const breakdown = contribs.map((x, i) => {
+      const frac = Math.abs(x.v) / maxAbs; const half = 50 * frac;
+      const positive = x.v >= 0;
+      const col = x.coral ? 'var(--coral)' : (positive ? 'var(--amber)' : 'var(--steel)');
+      return {
+        key: i, label: x.label,
+        value: (x.v >= 0 ? '+' : '') + x.v.toFixed(1),
+        valColor: x.coral ? 'var(--coral-bright)' : (positive ? 'var(--amber)' : 'var(--steel-bright)'),
+        barStyle: {
+          position: 'absolute', top: '2px', bottom: '2px',
+          left: positive ? '50%' : (50 - half) + '%', width: half + '%',
+          background: col, borderRadius: '1px',
+        },
+      };
+    });
+
+    // leaderboard
+    const order = this.scenarios.map((s, i) => ({ i, f: finals[i] })).sort((a, b) => b.f - a.f);
+    const rowBase = { display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 0', borderTop: '1px solid var(--border)' };
+    const leaderboard = order.map((o, rank) => {
+      const s2 = this.scenarios[o.i]; const sel = o.i === this.state.selected;
+      return {
+        key: o.i, rank: rank + 1, label: s2.label,
+        labelColor: sel ? 'var(--text-bright)' : 'var(--text-secondary)',
+        score: (o.f >= 0 ? '+' : '') + o.f.toFixed(0),
+        scoreColor: rank === 0 ? 'var(--amber-bright)' : (o.f < 0 ? 'var(--steel-bright)' : 'var(--text-secondary)'),
+        dotStyle: { width: '9px', height: '9px', borderRadius: '50%', background: s2.color, flex: '0 0 auto', boxShadow: sel ? '0 0 0 2px var(--void), 0 0 0 3px ' + s2.color : 'none' },
+        rowStyle: rank === 0 ? { ...rowBase, background: 'var(--amber-wash)' } : rowBase,
+      };
+    });
+
+    const winnerIdx = order[0].i;
+    return {
+      coeffRows, presets, resetCoeffs: this.resetCoeffs,
+      miniBtn: { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', padding: '5px 9px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-secondary)' },
+      miniBtnHover: { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', padding: '5px 9px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--border)', color: 'var(--text-primary)' },
+      scenarioTabs, gridLines, yTicks, xTicks, chartLines, endDots,
+      breakdown, leaderboard,
+      selectedDesc: sc.desc, selectedLabel: sc.label, selectedColor: sc.color,
+      winnerLabel: this.scenarios[winnerIdx].label, winnerColor: this.scenarios[winnerIdx].color,
+      winnerScore: (order[0].f >= 0 ? '+' : '') + order[0].f.toFixed(0),
+      showHelp: !(this.props.captureMode ?? false),
+    };
+  }
+}
+</script>
+</body>
+</html>

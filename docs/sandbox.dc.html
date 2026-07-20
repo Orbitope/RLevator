@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    @keyframes ckIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-track { background: var(--void); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+    select { -webkit-appearance: none; appearance: none; }
+    input[type=range] { accent-color: var(--amber); }
+  </style>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 56"><rect width="80" height="56" fill="#111009"/><rect x="12" y="8" width="8" height="40" fill="#2C2A22" rx="1"/><rect x="26" y="8" width="8" height="40" fill="#2C2A22" rx="1"/><rect x="40" y="8" width="8" height="40" fill="#2C2A22" rx="1"/><rect x="14" y="28" width="4" height="8" fill="#C49A3C" rx="1"/><rect x="28" y="16" width="4" height="8" fill="#C49A3C" rx="1"/><rect x="42" y="34" width="4" height="8" fill="#C49A3C" rx="1"/><rect x="54" y="8" width="18" height="40" fill="#1E1C16" rx="2"/><rect x="56" y="10" width="14" height="4" fill="#3D3A30" rx="1"/><rect x="56" y="16" width="10" height="4" fill="#C49A3C" rx="1"/><rect x="56" y="22" width="12" height="4" fill="#3D3A30" rx="1"/></svg></template>
+</helmet>
+<div data-screen-label="Elevator RL Sandbox" style="display:flex;flex-direction:column;height:100vh;width:100%;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:center;justify-content:space-between;height:50px;flex:0 0 auto;padding:0 18px;border-bottom:1px solid var(--border);background:var(--surface);">
+    <div style="display:flex;align-items:baseline;gap:12px;">
+      <span style="font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:0.05em;color:var(--text-bright);">ELEVATOR</span>
+      <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">RL Control Sandbox</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:26px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">sim time</span>
+        <span style="font-family:var(--font-mono);font-size:15px;color:var(--text-primary);font-variant-numeric:tabular-nums;">{{ clock }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">pattern</span>
+        <span style="font-family:var(--font-mono);font-size:15px;color:var(--amber);font-variant-numeric:tabular-nums;">{{ activePatternLabel }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">step</span>
+        <span style="font-family:var(--font-mono);font-size:15px;color:var(--text-primary);font-variant-numeric:tabular-nums;">{{ step }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+
+    <section ref="{{ setSectionRef }}" style="flex:1;min-width:0;position:relative;overflow:auto;padding:16px 18px;background:var(--void);">
+      <div style="{{ innerStyle }}">
+        <sc-for list="{{ floors }}" as="fl" hint-placeholder-count="8">
+          <div style="{{ fl.bandStyle }}">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-right:1px solid var(--border);">
+              <span style="font-family:var(--font-mono);font-size:14px;color:var(--text-primary);font-variant-numeric:tabular-nums;line-height:1;">{{ fl.label }}</span>
+              <div style="display:flex;gap:5px;line-height:1;">
+                <span style="{{ fl.upCallStyle }}">&#9650;</span>
+                <span style="{{ fl.downCallStyle }}">&#9660;</span>
+              </div>
+            </div>
+            <div style="position:absolute;left:54px;right:0;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 10px;">
+              <div style="{{ fl.trackStyle }}">
+                <sc-for list="{{ fl.upTiles }}" as="t" hint-placeholder-count="0">
+                  <div style="{{ t.style }}"><span style="font-family:var(--font-mono);font-size:9px;line-height:1;color:inherit;">{{ t.dest }}</span><div style="{{ t.barStyle }}"></div></div>
+                </sc-for>
+                <sc-if value="{{ fl.upHasMore }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);padding-left:2px;align-self:center;">+{{ fl.upMore }}</span></sc-if>
+              </div>
+              <div style="{{ fl.trackStyle }}">
+                <sc-for list="{{ fl.downTiles }}" as="t" hint-placeholder-count="0">
+                  <div style="{{ t.style }}"><span style="font-family:var(--font-mono);font-size:9px;line-height:1;color:inherit;">{{ t.dest }}</span><div style="{{ t.barStyle }}"></div></div>
+                </sc-for>
+                <sc-if value="{{ fl.downHasMore }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);padding-left:2px;align-self:center;">+{{ fl.downMore }}</span></sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="{{ shaftsStyle }}">
+          <sc-for list="{{ elevators }}" as="el" hint-placeholder-count="3">
+            <div style="{{ el.shaftStyle }}">
+              <span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;color:var(--text-muted);">{{ el.idLabel }}</span>
+              <div style="{{ el.carStyle }}">
+                <div style="{{ el.doorStyle }}"></div>
+                <span style="font-family:var(--font-mono);font-size:12px;color:var(--amber-bright);font-variant-numeric:tabular-nums;line-height:1;">{{ el.loadLabel }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:36px;">
+                  <sc-for list="{{ el.dots }}" as="d" hint-placeholder-count="0"><span style="{{ d.style }}"></span></sc-for>
+                </div>
+                <span style="{{ el.dirStyle }}">{{ el.dirArrow }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <aside style="width:336px;flex:0 0 auto;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+
+      <div style="padding:18px 20px 16px;border-bottom:1px solid var(--border);">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">cumulative reward</span>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-top:6px;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--amber-bright);font-variant-numeric:tabular-nums;">{{ rewardTotal }}</span>
+          <span style="font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;color:{{ rewardLastColor }};">{{ rewardLast }} / step</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border);">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+          <div style="{{ k.cellStyle }}">
+            <span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">{{ k.label }}</span>
+            <span style="font-family:var(--font-mono);font-size:20px;color:var(--text-bright);font-variant-numeric:tabular-nums;margin-top:4px;">{{ k.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">elevator utilization</span>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;">
+          <sc-for list="{{ util }}" as="u" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);width:22px;">{{ u.label }}</span>
+              <div style="flex:1;height:8px;background:var(--void);border:1px solid var(--border);border-radius:2px;overflow:hidden;position:relative;">
+                <div style="{{ u.barStyle }}"></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--amber);font-variant-numeric:tabular-nums;width:34px;text-align:right;">{{ u.pct }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">queue length / floor</span>
+          <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;color:var(--text-muted);">&#9650;up &#9660;dn</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:12px;">
+          <sc-for list="{{ qrows }}" as="q" hint-placeholder-count="8">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);width:18px;text-align:right;">{{ q.label }}</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                <div style="height:5px;background:var(--void);border-radius:1px;overflow:hidden;"><div style="{{ q.upBarStyle }}"></div></div>
+                <div style="height:5px;background:var(--void);border-radius:1px;overflow:hidden;"><div style="{{ q.dnBarStyle }}"></div></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-variant-numeric:tabular-nums;width:30px;">{{ q.counts }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ showObs }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:16px 20px 22px;">
+          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">observation &#183; limited</span>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">car_locations</div>
+              <div style="font-family:var(--font-mono);font-size:12px;color:var(--steel-bright);letter-spacing:0.06em;">[ {{ obsLoc }} ]</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">car_buttons</div>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-for list="{{ obsCars }}" as="c" hint-placeholder-count="3">
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);letter-spacing:0.05em;"><span style="color:var(--text-muted);">{{ c.label }}</span> <span style="{{ c.bitStyle }}">{{ c.bits }}</span></div>
+                </sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">hall_buttons [up dn]</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);letter-spacing:0.04em;line-height:1.5;">{{ obsHall }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </aside>
+  </main>
+
+  <footer style="display:flex;align-items:center;gap:20px;height:64px;flex:0 0 auto;padding:0 18px;border-top:1px solid var(--border);background:var(--surface);overflow-x:auto;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button onClick="{{ togglePlay }}" style="{{ playStyle }}" style-hover="{{ playHover }}">{{ playLabel }}</button>
+      <button onClick="{{ stepOnce }}" style="{{ stepStyle }}" style-hover="{{ secHover }}">STEP</button>
+      <button onClick="{{ reset }}" style="{{ btnStyle }}" style-hover="{{ secHover }}">RESET</button>
+    </div>
+
+    <div style="width:1px;height:32px;background:var(--border);"></div>
+
+    <div style="display:flex;flex-direction:column;gap:3px;min-width:128px;">
+      <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">speed</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--amber);font-variant-numeric:tabular-nums;">{{ speed }}/s</span></div>
+      <input type="range" min="1" max="20" step="1" value="{{ speed }}" onChange="{{ onSpeed }}" style="width:100%;height:4px;" />
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:3px;min-width:128px;">
+      <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">traffic</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--amber);font-variant-numeric:tabular-nums;">{{ intensityLabel }}&#215;</span></div>
+      <input type="range" min="0" max="3" step="0.1" value="{{ intensity }}" onChange="{{ onIntensity }}" style="width:100%;height:4px;" />
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">pattern</span>
+      <select value="{{ pattern }}" onChange="{{ onPattern }}" disabled="{{ dayCycle }}" style="{{ patternSelectStyle }}">
+        <sc-for list="{{ patternOpts }}" as="p" hint-placeholder-count="5"><option value="{{ p.v }}">{{ p.label }}</option></sc-for>
+      </select>
+    </div>
+
+    <button onClick="{{ toggleDay }}" style="{{ dayStyle }}" style-hover="{{ secHover }}">DAY CYCLE&#160;&#160;{{ dayLabel }}</button>
+
+    <div style="width:1px;height:32px;background:var(--border);"></div>
+
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">scenario</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select value="{{ selectedScenario }}" onChange="{{ onLoadScenario }}" style="{{ scenarioSelectStyle }}">
+          <option value="">&#8212; saved &#8212;</option>
+          <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="0"><option value="{{ s.name }}">{{ s.name }}</option></sc-for>
+        </select>
+        <button onClick="{{ saveScenario }}" style="{{ miniBtnStyle }}" style-hover="{{ secHover }}" title="Save current config">SAVE</button>
+        <button onClick="{{ deleteScenario }}" style="{{ miniBtnStyle }}" style-hover="{{ secHover }}" title="Delete selected">DEL</button>
+        <button onClick="{{ exportScenario }}" style="{{ miniBtnStyle }}" style-hover="{{ secHover }}" title="Download config JSON">EXPORT</button>
+        <button onClick="{{ importScenario }}" style="{{ miniBtnStyle }}" style-hover="{{ secHover }}" title="Load config from file">IMPORT</button>
+      </div>
+    </div>
+
+    <div style="width:1px;height:32px;background:var(--border);"></div>
+
+    <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">floors</span><select value="{{ numFloors }}" onChange="{{ onFloors }}" style="{{ selectStyle }}"><sc-for list="{{ floorOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for></select></div>
+    <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">cars</span><select value="{{ numElevators }}" onChange="{{ onElevators }}" style="{{ selectStyle }}"><sc-for list="{{ elevOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for></select></div>
+    <div style="display:flex;flex-direction:column;gap:4px;"><span style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);">capacity</span><select value="{{ capacity }}" onChange="{{ onCapacity }}" style="{{ selectStyle }}"><sc-for list="{{ capOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for></select></div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:800},&quot;showObservation&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = {
+    numFloors: 8, numElevators: 3, capacity: 8, maxQueue: 12, maxWait: 55,
+    pattern: 'up-peak', intensity: 1.0, speed: 5, dayCycle: false,
+    playing: false, floorHeight: 62,
+    scenarios: [], selectedScenario: '',
+  };
+
+  // ---------- config persistence (IndexedDB, works on static hosting / GitHub Pages) ----------
+  DB_NAME = 'elevator-rl'; STORE = 'scenarios'; CFG_VERSION = 1;
+  CFG_KEYS = ['numFloors', 'numElevators', 'capacity', 'maxQueue', 'maxWait', 'pattern', 'intensity', 'speed', 'dayCycle'];
+
+  openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.DB_NAME, 1);
+      req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains(this.STORE)) db.createObjectStore(this.STORE, { keyPath: 'name' }); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async dbAll() { const db = await this.openDB(); return new Promise((res, rej) => { const r = db.transaction(this.STORE).objectStore(this.STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+  async dbPut(rec) { const db = await this.openDB(); return new Promise((res, rej) => { const t = db.transaction(this.STORE, 'readwrite'); t.objectStore(this.STORE).put(rec); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+  async dbDel(name) { const db = await this.openDB(); return new Promise((res, rej) => { const t = db.transaction(this.STORE, 'readwrite'); t.objectStore(this.STORE).delete(name); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+
+  currentConfig() { const c = {}; for (const k of this.CFG_KEYS) c[k] = this.state[k]; return c; }
+  applyConfig(cfg) {
+    const patch = {};
+    for (const k of this.CFG_KEYS) if (cfg[k] !== undefined) patch[k] = cfg[k];
+    this.setState({ ...patch, playing: false }, () => { this.syncTimer(); this.rebuild(); this.measure(); this.forceUpdate(); });
+  }
+  async refreshScenarios(sel) {
+    try { const all = await this.dbAll(); this.setState({ scenarios: all.map((r) => ({ name: r.name })), ...(sel !== undefined ? { selectedScenario: sel } : {}) }); }
+    catch (e) { console.warn('scenario list failed', e); }
+  }
+
+  saveScenario = async () => {
+    const name = window.prompt('Save scenario as:', this.state.selectedScenario || 'my-scenario');
+    if (!name) return;
+    await this.dbPut({ name, version: this.CFG_VERSION, config: this.currentConfig() });
+    this.refreshScenarios(name);
+  };
+  onLoadScenario = async (e) => {
+    const name = e.target.value;
+    this.setState({ selectedScenario: name });
+    if (!name) return;
+    const all = await this.dbAll();
+    const rec = all.find((r) => r.name === name);
+    if (rec) this.applyConfig(rec.config);
+  };
+  deleteScenario = async () => {
+    const name = this.state.selectedScenario;
+    if (!name || !window.confirm('Delete scenario "' + name + '"?')) return;
+    await this.dbDel(name);
+    this.refreshScenarios('');
+  };
+  exportScenario = () => {
+    const name = this.state.selectedScenario || 'elevator-config';
+    const payload = { name, version: this.CFG_VERSION, config: this.currentConfig() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name + '.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  importScenario = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json,.json';
+    inp.onchange = () => {
+      const file = inp.files && inp.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const data = JSON.parse(reader.result);
+          const cfg = data.config || data;
+          this.applyConfig(cfg);
+          if (data.name) { await this.dbPut({ name: data.name, version: this.CFG_VERSION, config: cfg }); this.refreshScenarios(data.name); }
+        } catch (err) { window.alert('Could not read config: ' + err.message); }
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  };
+
+  weights = { delivered: 10, toward: 0.4, rejected: -5, abandoned: -8, away: -0.4, inEl: -0.04, inQ: -0.12 };
+  minutesPerStep = 2;
+  PATTERNS = [
+    { v: 'up-peak', label: 'Up-peak' },
+    { v: 'down-peak', label: 'Down-peak' },
+    { v: 'lunch', label: 'Lunch' },
+    { v: 'midday', label: 'Midday' },
+    { v: 'uniform', label: 'Uniform' },
+  ];
+
+  constructor(props) {
+    super(props);
+    this.rebuild();
+  }
+
+  componentDidMount() {
+    this.ro = new ResizeObserver(() => this.measure());
+    if (this.sectionRef) this.ro.observe(this.sectionRef);
+    this.measure();
+    this.refreshScenarios();
+    if (typeof window !== 'undefined') window.elevatorView = { render: this.ingest, getState: () => this.snap };
+  }
+  componentWillUnmount() {
+    if (this.timer) clearInterval(this.timer);
+    if (this.ro) this.ro.disconnect();
+  }
+
+  setSectionRef = (el) => {
+    this.sectionRef = el;
+    if (el && this.ro) this.ro.observe(el);
+  };
+
+  measure = () => {
+    if (!this.sectionRef) return;
+    const h = this.sectionRef.clientHeight - 32;
+    const fh = Math.max(40, Math.min(86, Math.floor(h / this.state.numFloors)));
+    if (fh !== this.state.floorHeight) this.setState({ floorHeight: fh });
+  };
+
+  // ---------- simulation construction ----------
+  rebuild() {
+    const { numFloors: NF, numElevators: NE } = this.state;
+    this.pid = 0; this.step = 0;
+    this.totalReward = 0; this.lastReward = 0;
+    this.delivered = 0; this.rejected = 0; this.abandoned = 0;
+    this.waitSum = 0; this.waitCount = 0; this.maxWaitObs = 0;
+    this.upQ = Array.from({ length: NF }, () => []);
+    this.downQ = Array.from({ length: NF }, () => []);
+    this.elevators = Array.from({ length: NE }, (_, i) => ({
+      id: i,
+      floor: NE > 1 ? Math.round(i * (NF - 1) / (NE - 1)) : 0,
+      minFloor: 0, maxFloor: NF - 1,
+      riders: [], dir: 1, doorOpen: false, utilSum: 0, utilSteps: 0,
+    }));
+    this.generateParams(this.getActivePattern());
+    this.snap = this.buildSnapshot();
+  }
+
+  // ---------- SNAPSHOT CONTRACT ----------
+  // The renderer reads ONLY from a snapshot object of this shape. The built-in sim
+  // below is just a mock that produces these; the real RLevator env produces the
+  // same shape (see snapshot-schema doc) and pushes it via window.elevatorView.render().
+  //   {
+  //     step, clockMinutes, pattern,
+  //     config: { numFloors, numElevators, capacity, maxQueue, maxWait },
+  //     cars: [{ id, floor, dir(+1|-1), doorOpen, riders:[destFloor,...], util(0..1) }],
+  //     upQueues:   [ [{dest, wait}, ...], ... per floor ],
+  //     downQueues: [ [{dest, wait}, ...], ... per floor ],
+  //     reward: { total, last },
+  //     metrics: { delivered, throughput, avgWait, maxWait, rejected, abandoned }
+  //   }
+  buildSnapshot() {
+    const { numFloors: NF, numElevators: NE, capacity: cap, maxQueue: maxQ, maxWait: maxW } = this.state;
+    return {
+      step: this.step,
+      clockMinutes: (6 * 60 + this.step * this.minutesPerStep) % 1440,
+      pattern: this.getActivePattern(),
+      config: { numFloors: NF, numElevators: NE, capacity: cap, maxQueue: maxQ, maxWait: maxW },
+      cars: this.elevators.map((el) => ({
+        id: el.id, floor: el.floor, dir: el.dir, doorOpen: !!el.doorOpen,
+        riders: el.riders.map((p) => p.dest),
+        util: el.utilSteps ? el.utilSum / el.utilSteps : 0,
+      })),
+      upQueues: this.upQ.map((q) => q.map((p) => ({ dest: p.dest, wait: p.wait }))),
+      downQueues: this.downQ.map((q) => q.map((p) => ({ dest: p.dest, wait: p.wait }))),
+      reward: { total: this.totalReward, last: this.lastReward },
+      metrics: {
+        delivered: this.delivered,
+        throughput: this.step ? this.delivered / this.step : 0,
+        avgWait: this.waitCount ? this.waitSum / this.waitCount : 0,
+        maxWait: this.maxWaitObs,
+        rejected: this.rejected,
+        abandoned: this.abandoned,
+      },
+    };
+  }
+
+  // External driver hook: push a snapshot (from RLevator replay file or WebSocket).
+  // Calling this switches the view into external mode and stops the internal mock.
+  ingest = (snap) => {
+    this.external = true;
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.snap = snap;
+    this.forceUpdate();
+  };
+
+  // ---------- arrival parameters (per-floor lambda + destination matrix) ----------
+  generateParams(pattern) {
+    const NF = this.state.numFloors, top = NF - 1;
+    let lam;
+    if (pattern === 'up-peak') { lam = new Array(NF).fill(0.05); lam[0] = 0.9; }
+    else if (pattern === 'down-peak') { lam = new Array(NF).fill(0.22); lam[0] = 0.04; }
+    else if (pattern === 'lunch') { lam = new Array(NF).fill(0.1); lam[0] = 0.5; lam[top] = 0.45; }
+    else if (pattern === 'midday') { lam = new Array(NF).fill(0.15); }
+    else { lam = new Array(NF).fill(0.2); }
+
+    const dest = [];
+    for (let o = 0; o < NF; o++) {
+      const row = new Array(NF).fill(0);
+      if (pattern === 'up-peak') {
+        if (o === 0) { for (let d = 1; d < NF; d++) row[d] = 1; }
+        else { row[0] = 4; for (let d = 1; d < NF; d++) if (d !== o) row[d] = 0.4; }
+      } else if (pattern === 'down-peak') {
+        if (o === 0) { for (let d = 1; d < NF; d++) row[d] = 1; }
+        else { row[0] = 6; for (let d = 1; d < NF; d++) if (d !== o) row[d] = 0.3; }
+      } else if (pattern === 'lunch') {
+        if (o === 0) { row[top] = 4; for (let d = 1; d < NF; d++) if (d !== top) row[d] = 0.4; }
+        else if (o === top) { row[0] = 4; for (let d = 1; d < top; d++) row[d] = 0.4; }
+        else { row[0] = 2; if (top !== o) row[top] = 2; for (let d = 1; d < NF; d++) if (d !== o) row[d] += 0.2; }
+      } else {
+        for (let d = 0; d < NF; d++) if (d !== o) row[d] = 1;
+      }
+      const s = row.reduce((a, b) => a + b, 0) || 1;
+      for (let d = 0; d < NF; d++) row[d] /= s;
+      dest.push(row);
+    }
+    this.lambdas = lam; this.destDist = dest;
+  }
+
+  poisson(l) {
+    if (l <= 0) return 0;
+    const L = Math.exp(-l); let k = 0, p = 1;
+    do { k++; p *= Math.random(); } while (p > L);
+    return k - 1;
+  }
+  sampleDest(o) {
+    const row = this.destDist[o]; const r = Math.random(); let c = 0;
+    for (let d = 0; d < row.length; d++) { c += row[d]; if (r <= c) return d; }
+    return o === 0 ? 1 : 0;
+  }
+
+  getActivePattern() {
+    if (!this.state.dayCycle) return this.state.pattern;
+    const m = (6 * 60 + this.step * this.minutesPerStep) % 1440; const h = m / 60;
+    if (h >= 6 && h < 10) return 'up-peak';
+    if (h >= 11 && h < 14) return 'lunch';
+    if (h >= 16 && h < 19) return 'down-peak';
+    return 'midday';
+  }
+
+  // ---------- the environment step ----------
+  doStep() {
+    const { numFloors: NF, numElevators: NE, capacity: cap, maxQueue: maxQ, maxWait: maxW } = this.state;
+    this.generateParams(this.getActivePattern());
+    const r = { delivered: 0, toward: 0, away: 0, rejected: 0, abandoned: 0 };
+
+    // 1. generate arrivals
+    const incoming = [];
+    for (let f = 0; f < NF; f++) {
+      const n = this.poisson(this.lambdas[f] * this.state.intensity);
+      for (let i = 0; i < n; i++) {
+        const d = this.sampleDest(f);
+        if (d === f) continue;
+        incoming.push({ id: this.pid++, origin: f, dest: d, arrival: this.step, wait: 0, age: 0, dir: d > f ? 1 : -1 });
+      }
+    }
+    // 2. remove queue passengers past max wait
+    for (let f = 0; f < NF; f++) {
+      for (const q of [this.upQ[f], this.downQ[f]]) {
+        for (let i = q.length - 1; i >= 0; i--) if (q[i].wait >= maxW) { q.splice(i, 1); r.abandoned++; }
+      }
+    }
+    // 3. add new passengers to queues (reject if full)
+    for (const p of incoming) {
+      const q = p.dir > 0 ? this.upQ[p.origin] : this.downQ[p.origin];
+      if (q.length >= maxQ) r.rejected++; else q.push(p);
+    }
+    // 4. execute one action per elevator
+    const actions = this.choose();
+    for (let i = 0; i < NE; i++) this.apply(this.elevators[i], actions[i], r);
+    // 5. increment wait (queued) + age (everyone)
+    for (let f = 0; f < NF; f++) {
+      for (const q of [this.upQ[f], this.downQ[f]]) {
+        for (const p of q) { p.wait++; p.age++; if (p.wait > this.maxWaitObs) this.maxWaitObs = p.wait; }
+      }
+    }
+    for (const el of this.elevators) {
+      for (const p of el.riders) p.age++;
+      el.utilSum += el.riders.length / cap; el.utilSteps++;
+    }
+    // 6. step++
+    this.step++;
+    // 7. reward
+    const inEl = this.elevators.reduce((a, e) => a + e.riders.length, 0);
+    const inQ = this.upQ.reduce((a, q) => a + q.length, 0) + this.downQ.reduce((a, q) => a + q.length, 0);
+    const W = this.weights;
+    const rew = W.delivered * r.delivered + W.toward * r.toward + W.rejected * r.rejected
+      + W.abandoned * r.abandoned + W.away * r.away + W.inEl * inEl + W.inQ * inQ;
+    this.lastReward = rew; this.totalReward += rew;
+    this.delivered += r.delivered; this.rejected += r.rejected; this.abandoned += r.abandoned;
+    this.snap = this.buildSnapshot();
+  }
+
+  apply(el, a, r) {
+    const cap = this.state.capacity;
+    el.doorOpen = false;
+    if (a === 5) {
+      el.doorOpen = true;
+      for (let i = el.riders.length - 1; i >= 0; i--) {
+        const p = el.riders[i];
+        if (p.dest === el.floor) { r.delivered++; this.waitSum += p.wait; this.waitCount++; el.riders.splice(i, 1); }
+      }
+      return;
+    }
+    if (a === 3 || a === 4) {
+      el.doorOpen = true;
+      const q = a === 3 ? this.upQ[el.floor] : this.downQ[el.floor];
+      while (el.riders.length < cap && q.length > 0) el.riders.push(q.shift());
+      el.dir = a === 3 ? 1 : -1;
+      return;
+    }
+    if (a === 1) {
+      if (el.floor < el.maxFloor) {
+        for (const p of el.riders) { if (p.dest > el.floor) r.toward++; else r.away++; }
+        el.floor++; el.dir = 1;
+      }
+      return;
+    }
+    if (a === 2) {
+      if (el.floor > el.minFloor) {
+        for (const p of el.riders) { if (p.dest < el.floor) r.toward++; else r.away++; }
+        el.floor--; el.dir = -1;
+      }
+      return;
+    }
+  }
+
+  // ---------- basic dispatch policy (collective / LOOK + nearest-car) ----------
+  choose() {
+    const { numFloors: NF, capacity: cap } = this.state;
+    const upCalls = [], downCalls = [];
+    for (let f = 0; f < NF; f++) { if (this.upQ[f].length) upCalls.push(f); if (this.downQ[f].length) downCalls.push(f); }
+
+    const target = this.elevators.map((el) => {
+      if (el.riders.length) {
+        const dests = el.riders.map((p) => p.dest);
+        const ahead = dests.filter((d) => (el.dir > 0 ? d > el.floor : d < el.floor));
+        const pool = ahead.length ? ahead : dests;
+        return pool.reduce((b, d) => (Math.abs(d - el.floor) < Math.abs(b - el.floor) ? d : b), pool[0]);
+      }
+      return null;
+    });
+
+    // assign hall calls to nearest empty cars (greedy, no double-claim)
+    const claimed = new Set();
+    const cand = [...new Set([...upCalls, ...downCalls])];
+    for (let i = 0; i < this.elevators.length; i++) {
+      const el = this.elevators[i];
+      if (el.riders.length) continue;
+      let best = null, bd = 1e9;
+      for (const f of cand) {
+        if (claimed.has(f) || f < el.minFloor || f > el.maxFloor) continue;
+        const d = Math.abs(f - el.floor);
+        if (d < bd) { bd = d; best = f; }
+      }
+      if (best != null) { claimed.add(best); target[i] = best; }
+    }
+
+    return this.elevators.map((el, i) => {
+      const f = el.floor;
+      if (el.riders.some((p) => p.dest === f)) return 5;            // unload
+      const rem = cap - el.riders.length;
+      if (rem > 0) {
+        if (el.riders.length === 0) {
+          if (this.upQ[f].length && (target[i] == null || target[i] >= f)) return 3;
+          if (this.downQ[f].length) return 4;
+          if (this.upQ[f].length) return 3;
+        } else {
+          if (el.dir > 0 && this.upQ[f].length) return 3;
+          if (el.dir < 0 && this.downQ[f].length) return 4;
+        }
+      }
+      const t = target[i];
+      if (t == null) return 0;
+      if (t > f) return 1;
+      if (t < f) return 2;
+      if (rem > 0 && this.upQ[f].length) return 3;
+      if (rem > 0 && this.downQ[f].length) return 4;
+      return 0;
+    });
+  }
+
+  // ---------- run loop ----------
+  syncTimer() {
+    if (this.timer) clearInterval(this.timer);
+    if (this.state.playing) this.timer = setInterval(() => { this.doStep(); this.forceUpdate(); }, 1000 / this.state.speed);
+  }
+  togglePlay = () => { if (this.external) return; this.setState((s) => ({ playing: !s.playing }), () => this.syncTimer()); };
+  stepOnce = () => { if (this.external || this.state.playing) return; this.doStep(); this.forceUpdate(); };
+  reset = () => { this.external = false; this.setState({ playing: false }, () => { this.syncTimer(); this.rebuild(); this.measure(); this.forceUpdate(); }); };
+  onSpeed = (e) => this.setState({ speed: +e.target.value }, () => this.syncTimer());
+  onIntensity = (e) => this.setState({ intensity: +e.target.value });
+  onPattern = (e) => this.setState({ pattern: e.target.value });
+  toggleDay = () => this.setState((s) => ({ dayCycle: !s.dayCycle }));
+  rebuildCfg = (patch) => this.setState({ ...patch, playing: false }, () => { this.syncTimer(); this.rebuild(); this.measure(); this.forceUpdate(); });
+  onFloors = (e) => this.rebuildCfg({ numFloors: +e.target.value });
+  onElevators = (e) => this.rebuildCfg({ numElevators: +e.target.value });
+  onCapacity = (e) => this.rebuildCfg({ capacity: +e.target.value });
+
+  // ---------- view model ----------
+  renderVals() {
+    const snap = this.snap || this.buildSnapshot();
+    const cfg = snap.config;
+    const NF = cfg.numFloors, NE = cfg.numElevators, cap = cfg.capacity, maxQ = cfg.maxQueue, maxW = cfg.maxWait;
+    const fh = this.state.floorHeight;
+    const showObs = this.props.showObservation ?? true;
+    const shaftW = 46, gap = 12, maxTiles = 9;
+    const shaftsWidth = NE * shaftW + (NE - 1) * gap;
+    const innerH = NF * fh;
+    const rightPad = shaftsWidth + 30;
+    const tileH = Math.max(13, Math.min(22, Math.floor((fh - 16) / 2) - 1));
+
+    const callStyle = (active) => ({
+      fontSize: '9px', lineHeight: 1, fontFamily: 'var(--font-mono)',
+      color: active ? 'var(--amber-bright)' : 'var(--text-muted)', opacity: active ? 1 : 0.3,
+      textShadow: active ? '0 0 6px rgba(232,192,104,0.5)' : 'none',
+    });
+    const trackStyle = { display: 'flex', flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: '3px', height: tileH + 'px', overflow: 'hidden' };
+    const tilesFor = (q) => q.slice(0, maxTiles).map((p) => {
+      const fill = Math.min(1, p.wait / maxW); const urgent = p.wait >= 0.8 * maxW;
+      return {
+        key: p.id, dest: p.dest === 0 ? 'G' : p.dest,
+        style: {
+          position: 'relative', flex: '0 0 auto', width: '18px', height: tileH + 'px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px',
+          background: 'var(--raised)', border: '1px solid ' + (urgent ? 'var(--coral)' : 'var(--border)'),
+          color: urgent ? 'var(--coral-bright)' : 'var(--text-secondary)', overflow: 'hidden',
+          animation: 'ckIn 200ms ease both',
+        },
+        barStyle: { position: 'absolute', left: 0, bottom: 0, height: '2px', width: (fill * 100) + '%', background: urgent ? 'var(--coral)' : 'var(--amber)' },
+      };
+    });
+
+    const floors = [];
+    for (let f = NF - 1; f >= 0; f--) {
+      const top = (NF - 1 - f) * fh;
+      const up = snap.upQueues[f], dn = snap.downQueues[f];
+      floors.push({
+        key: f, label: f === 0 ? 'G' : String(f),
+        bandStyle: { position: 'absolute', left: 0, right: rightPad + 'px', top: top + 'px', height: fh + 'px', borderTop: '1px solid var(--border)' },
+        upCallStyle: callStyle(up.length > 0), downCallStyle: callStyle(dn.length > 0),
+        trackStyle,
+        upTiles: tilesFor(up), downTiles: tilesFor(dn),
+        upMore: Math.max(0, up.length - maxTiles), downMore: Math.max(0, dn.length - maxTiles),
+        upHasMore: up.length > maxTiles, downHasMore: dn.length > maxTiles,
+      });
+    }
+
+    const elevators = snap.cars.map((el) => {
+      const carTop = (NF - 1 - el.floor) * fh + 4;
+      const n = Math.min(el.riders.length, 18);
+      const dots = Array.from({ length: n }, (_, i) => ({ key: i, style: { width: '5px', height: '5px', borderRadius: '50%', background: 'var(--amber)' } }));
+      return {
+        key: el.id, idLabel: 'E' + el.id, loadLabel: el.riders.length + '/' + cap,
+        dirArrow: el.dir > 0 ? '\u25B2' : '\u25BC',
+        dirStyle: { fontSize: '8px', lineHeight: 1, color: el.dir > 0 ? 'var(--amber)' : 'var(--steel-bright)' },
+        shaftStyle: {
+          position: 'relative', width: shaftW + 'px', height: innerH + 'px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px',
+          backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent ' + (fh - 1) + 'px, var(--border) ' + (fh - 1) + 'px, var(--border) ' + fh + 'px)',
+        },
+        carStyle: {
+          position: 'absolute', left: '3px', right: '3px', top: carTop + 'px', height: (fh - 8) + 'px',
+          background: 'var(--raised)', border: '1px solid ' + (el.doorOpen ? 'var(--amber-bright)' : 'var(--amber)'),
+          borderRadius: '3px',
+          boxShadow: el.doorOpen ? '0 0 0 1px var(--amber), 0 0 16px rgba(232,192,104,0.28)' : '0 1px 2px rgba(0,0,0,0.45)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+          transition: 'top 240ms cubic-bezier(0.33,0,0.2,1), border-color 150ms, box-shadow 150ms', overflow: 'hidden',
+        },
+        doorStyle: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--amber-bright)', opacity: el.doorOpen ? 1 : 0, transition: 'opacity 150ms' },
+        dots,
+      };
+    });
+
+    // KPIs
+    const kpiCell = (i) => ({ display: 'flex', flexDirection: 'column', padding: '14px 16px', borderRight: (i % 3 !== 2) ? '1px solid var(--border)' : 'none', borderTop: i >= 3 ? '1px solid var(--border)' : 'none' });
+    const kpis = [
+      { label: 'delivered', value: snap.metrics.delivered },
+      { label: 'thru/step', value: snap.metrics.throughput.toFixed(2) },
+      { label: 'avg wait', value: snap.metrics.avgWait.toFixed(1) },
+      { label: 'max wait', value: snap.metrics.maxWait },
+      { label: 'rejected', value: snap.metrics.rejected },
+      { label: 'abandoned', value: snap.metrics.abandoned },
+    ].map((k, i) => ({ ...k, cellStyle: kpiCell(i) }));
+
+    const util = snap.cars.map((el) => {
+      const avg = el.util || 0;
+      return { key: el.id, label: 'E' + el.id, pct: (avg * 100).toFixed(0) + '%', barStyle: { position: 'absolute', left: 0, top: 0, bottom: 0, width: (avg * 100) + '%', background: 'var(--amber)' } };
+    });
+
+    const qrows = [];
+    for (let f = NF - 1; f >= 0; f--) {
+      const u = snap.upQueues[f].length, d = snap.downQueues[f].length;
+      qrows.push({
+        key: f, label: f === 0 ? 'G' : String(f), counts: u + '/' + d,
+        upBarStyle: { height: '100%', width: Math.min(100, (u / maxQ) * 100) + '%', background: 'var(--steel)' },
+        dnBarStyle: { height: '100%', width: Math.min(100, (d / maxQ) * 100) + '%', background: 'var(--data-2)' },
+      });
+    }
+
+    // limited observation
+    const obsLoc = snap.cars.map((e) => e.floor).join('  ');
+    const obsCars = snap.cars.map((el) => {
+      let bits = '';
+      for (let f = 0; f < NF; f++) bits += el.riders.includes(f) ? '1' : '0';
+      return { key: el.id, label: 'E' + el.id, bits, bitStyle: { color: el.riders.length ? 'var(--amber)' : 'var(--text-muted)' } };
+    });
+    let obsHall = '';
+    for (let f = 0; f < NF; f++) obsHall += (snap.upQueues[f].length ? 1 : 0) + '' + (snap.downQueues[f].length ? 1 : 0) + (f < NF - 1 ? ' ' : '');
+
+    // clock
+    const m = snap.clockMinutes;
+    const clock = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const activePatternLabel = (this.PATTERNS.find((p) => p.v === snap.pattern) || {}).label || '';
+
+    // control styling
+    const btnBase = { fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.12em', padding: '9px 14px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-primary)' };
+    const playStyle = this.state.playing
+      ? { ...btnBase, background: 'var(--raised)', borderColor: 'var(--amber)', color: 'var(--amber-bright)', minWidth: '74px' }
+      : { ...btnBase, background: 'var(--amber)', borderColor: 'var(--amber)', color: 'var(--void)', fontWeight: 600, minWidth: '74px' };
+    const selectStyle = { fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-primary)', background: 'var(--raised)', border: '1px solid var(--border)', borderRadius: '3px', padding: '6px 8px', cursor: 'pointer' };
+
+    return {
+      // header / state
+      clock, step: snap.step, activePatternLabel,
+      // building
+      innerStyle: { position: 'relative', height: innerH + 'px', minHeight: innerH + 'px', borderBottom: '1px solid var(--border)' },
+      shaftsStyle: { position: 'absolute', top: 0, right: '8px', width: shaftsWidth + 'px', height: innerH + 'px', display: 'flex', gap: gap + 'px' },
+      floors, elevators,
+      setSectionRef: this.setSectionRef,
+      // hud
+      rewardTotal: snap.reward.total.toFixed(1),
+      rewardLast: (snap.reward.last >= 0 ? '+' : '') + snap.reward.last.toFixed(2),
+      rewardLastColor: snap.reward.last >= 0 ? 'var(--amber-bright)' : 'var(--steel-bright)',
+      kpis, util, qrows,
+      showObs, obsLoc, obsCars, obsHall,
+      // controls
+      togglePlay: this.togglePlay, stepOnce: this.stepOnce, reset: this.reset,
+      onSpeed: this.onSpeed, onIntensity: this.onIntensity, onPattern: this.onPattern,
+      toggleDay: this.toggleDay, onFloors: this.onFloors, onElevators: this.onElevators, onCapacity: this.onCapacity,
+      playLabel: this.state.playing ? 'PAUSE' : 'PLAY',
+      speed: this.state.speed, intensity: this.state.intensity, intensityLabel: this.state.intensity.toFixed(1),
+      pattern: this.state.pattern, dayCycle: this.state.dayCycle, dayLabel: this.state.dayCycle ? 'ON' : 'OFF',
+      numFloors: NF, numElevators: NE, capacity: cap,
+      patternOpts: this.PATTERNS, floorOpts: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], elevOpts: [1, 2, 3, 4, 5, 6], capOpts: [4, 6, 8, 10, 12, 16],
+      playStyle, playHover: { ...playStyle, filter: 'brightness(1.08)' },
+      btnStyle: btnBase, secHover: { ...btnBase, background: 'var(--border)' },
+      stepStyle: { ...btnBase, opacity: this.state.playing ? 0.4 : 1 },
+      dayStyle: { ...btnBase, borderColor: this.state.dayCycle ? 'var(--amber)' : 'var(--border)', color: this.state.dayCycle ? 'var(--amber-bright)' : 'var(--text-secondary)', whiteSpace: 'nowrap' },
+      patternSelectStyle: { ...selectStyle, opacity: this.state.dayCycle ? 0.4 : 1 },
+      selectStyle,
+      scenarios: this.state.scenarios, selectedScenario: this.state.selectedScenario,
+      saveScenario: this.saveScenario, onLoadScenario: this.onLoadScenario, deleteScenario: this.deleteScenario,
+      exportScenario: this.exportScenario, importScenario: this.importScenario,
+      scenarioSelectStyle: { ...selectStyle, minWidth: '110px', fontSize: '11px', padding: '6px 7px' },
+      miniBtnStyle: { ...btnBase, fontSize: '9.5px', letterSpacing: '0.1em', padding: '7px 8px' },
+    };
+  }
+}
+</script>
+</body>
+</html>
