@@ -89,7 +89,55 @@ Each "why does RL lose?" hypothesis was killed by a specific number:
     "RL doesn't beat LOOK," on traffic later shown to be degenerate (E15). The exact pattern that
     anchored the project's original pessimism is now, on honest traffic, its strongest result — likely
     because UpPeak's converge-on-one-floor structure is the most learnable/exploitable pattern of all,
-    more so than Midday's diffuse interfloor traffic. **← we are here.**
+    more so than Midday's diffuse interfloor traffic.
+17. **The sim leaves Unity — and the port is held to the standard Act III taught us.** After E15
+    proved a benchmark can silently be the bug, the sim core was ported to a batched PyTorch env the
+    paranoid way: a written spec as the single source of truth, TWO independent implementations
+    (readable vs vectorized) differential-tested bit-for-bit at zero tolerance, invariants checked
+    batch-wide every step. The battery passed its first full run — and the one scare resolved the
+    Act-II way: Python LOOK seemed to deliver 12% more per hour than Unity ("did the generator
+    drift?"), until integrating the arrival tables over each eval's *actual* time window showed the
+    whole gap was eval windowing; the generator matches Unity to <1.2%, and LOOK's wait distribution
+    (5.79 s / P95 15.5 s vs Unity's 5.96 s / 16.9 s) carries over. Hypothesis killed by arithmetic,
+    port validated (`EXPERIMENT_PLAN.md` §9).
+18. **The payoff is measured, and it's the whole reason: 37×.** The migration was never about
+    training speed (that was already headless) — it was about *iteration*, which the Editor gates.
+    Held to a real baseline (the actual rung-S headless Unity PPO run: 1,247 steps/s across 20 envs),
+    the tensor env does 46,479 end-to-end on the same laptop, CPU-only: a 5M-step run falls from 67
+    minutes to under 2. The honest shape of the win: `torch.compile` buys ~3×, batching saturates
+    around N≈16k on 5 CPU cores, and — the counterintuitive part — batching *alone*, uncompiled, was
+    briefly slower than a plain single-instance loop. Enough that the tempting next move (rewrite for
+    JAX, rent cloud TPUs) is explicitly *deferred*: bank the free 37×, escalate to cloud-CUDA only
+    when a measured scale run proves it necessary. The catch the win exposed: with Unity out of the
+    loop, the *eval* pipeline has to be rebuilt in Python too, or "RL beats LOOK" would be comparing
+    across two rulers.
+19. **On the new pipeline, RL finally beats LOOK — at M, not S, exactly as promised.** With the
+    Python eval rebuilt and matched to Unity, the tensor env trained PPO end-to-end. Two traps had
+    to be walked through first, both re-discoveries of this plan's own scars: greedy eval collapsed
+    an otherwise-competent policy (a full car parking on a legal no-op — the E13c train/eval-mismatch
+    lesson in miniature), fixed by masking board-when-full and annealing entropy to zero; and a
+    value-based detour (D3QN) proved robust but delivered ~2× the wait, so PPO — which had learned
+    the *better* policy all along — stayed. On rung S the result is a clean **tie** with LOOK
+    (waitMean 5.85 vs 5.9 s, zero abandonment) — precisely the thesis's prediction that RL can't beat
+    a good heuristic on a small building. Then M: the naive net collapsed (M needs the bigger net —
+    E6, rediscovered), but bignet2 at 10M **beat LOOK by 18% on mean wait, 19% on the tail, with a
+    quarter the abandonment, at equal throughput.** The first rung where the RL win is real. The
+    honest asterisk: it beats Unity's own E6 (which only matched) — likely the board-when-full mask,
+    to be attributed before it's leaned on.
+20. **The architecture bake-off had a twist ending: it wasn't the architecture.** We built four
+    policy nets — flat MLP, floor-conv, shared-per-car, and cross-car attention — expecting the
+    coordination-aware ones to pull ahead at scale (8 cars at L). Two of them had to be debugged the
+    honest way (conv's first impl never fed a car its own riders' destinations — caught in a 3-min
+    learning-check, not a 50-min run, after the lesson that you deep-dive an architecture *before*
+    trusting a long run). But when all four were correct and trained: **flat won at every rung.** The
+    fancy nets reliably scored *higher shaped-reward* yet *deployed worse* — they were better at
+    gaming the objective, not at moving people. That pointed the finger away from the network and at
+    the reward. One ablation settled it: deleting the ±0.4 "moved-toward" shaping term — the exact
+    thing the fancy nets exploited — made the plain flat policy **strictly better**, beating LOOK at
+    M by −25% wait with **zero abandonment**, and at L cutting abandonment from 20 to 3. The whole
+    architecture detour resolved to a one-line reward change. The lesson that keeps repeating in this
+    project — *the benchmark/objective is where the bug hides, not the model* — held one more time.
+    **← we are here.**
 - **If it keeps winning — the tradeoffs.** Reward variants (longest-wait vs journey-time vs
   lobby-priority) — note ETA still wins mean wait here, so "RL wins" is already metric-dependent, which
   is exactly what the reward-tradeoff axis is for. And the money question: **is destination-dispatch
