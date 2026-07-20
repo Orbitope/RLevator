@@ -66,16 +66,24 @@
           </div>
         </section>
 
-        <section class="rlv-scene" data-scene="1" style="min-height:280vh;padding:10vh 0;">
+        <section class="rlv-scene" data-scene="1" data-scroll-steps="10" style="min-height:360vh;padding:10vh 0;">
           <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
             <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">01 &#183; observation</div>
             <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">What the agent sees</h2>
           </div>
-          <div style="margin-top:26px;display:flex;flex-direction:column;gap:60vh;">
-            <p style="font-size:15px;line-height:1.6;">The whole input is one flat vector of numbers &mdash; 98 of them in the small building, 254 in the mid-size, 648 in the large &mdash; but it is really a live status panel of the building. Each block answers one question.</p>
-            <p style="font-size:15px;line-height:1.6;">Where is each car, and is it in service? Which way is it moving, and how full is it? These are the things a real elevator controller can measure directly.</p>
-            <p style="font-size:15px;line-height:1.6;">Which floors have someone waiting, pressing up or down &mdash; and how long has the oldest person there been waiting? The call lamps warm from steel to coral as they approach the 45-second abandon limit.</p>
-            <p style="font-size:15px;line-height:1.6;">Put together, this picture <em>is</em> the observation. And notice the blind spot: the agent never learns where waiting people want to go &mdash; only that they are waiting. A real hall call carries no destination. It must infer demand from the calls alone. This limit comes back later in a way I didn't expect.</p>
+          <!-- 10 paragraphs, one per reveal-beat in SceneObservation, evenly spaced so
+               each block lights up as its paragraph reaches the middle of the screen. -->
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:27vh;">
+            <p style="font-size:15px;line-height:1.6;">The agent's entire input is one flat vector of numbers &mdash; 98 of them in the small building, 254 in the mid-size, 648 in the large. But that vector is really a live status panel, and it's easiest to read one block at a time.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Where is each car?</strong> A one-hot row per car marks the floor it's on &mdash; simply its height in the shaft.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Is each car in service?</strong> One bit per car flags the ones switched off &mdash; they grey out and drop from the agent's control.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Which way is it moving, and where between floors?</strong> Travel direction &mdash; down, idle, up &mdash; plus a smooth fractional position.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">How full is it?</strong> Riders over capacity, drawn as the fill gauge &mdash; the difference between a car that can still stop for you and one that can't.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Where do the people aboard want off?</strong> The in-car destination buttons light the floors its riders are headed to.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Which floors are calling?</strong> Now the demand: a lamp beside a floor, up or down, means someone is waiting there.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">And how long have they waited?</strong> The call lamps warm from steel to coral as the oldest person there closes on the 45-second abandon limit.</p>
+            <p style="font-size:15px;line-height:1.6;">Together, these seven blocks <em>are</em> the observation &mdash; everything the agent knows, and nothing else, flattened into that one vector.</p>
+            <p style="font-size:15px;line-height:1.6;">And here's the blind spot. The agent sees that people are waiting, and for how long &mdash; but never <em>where they want to go</em>. A real hall call carries no destination, so it must infer demand from the calls alone. This limit comes back later in a way I didn't expect.</p>
           </div>
         </section>
 
@@ -310,15 +318,35 @@ class Component extends DCLogic {
     if (!blocks.length) return;
     const prog = new Array(this.N).fill(0);
     let active = 0;
+    const readLine = vh * 0.45;
     blocks.forEach((b) => {
       const i = +b.getAttribute('data-scene');
       const r = b.getBoundingClientRect();
-      const denom = Math.max(1, r.height - vh);
-      // window-scroll equivalent of the original inner-scroller math,
-      // quantized to 1/24 steps so scrolling doesn't re-render the whole
-      // scene tree at 60fps (six imported scenes are too heavy for that).
-      const raw = Math.max(0, Math.min(1, (vh * 0.15 - r.top) / denom));
-      prog[i] = Math.round(raw * 24) / 24;
+      if (b.hasAttribute('data-scroll-steps')) {
+        // Discrete step model: each narrative paragraph owns a scroll band, and
+        // the scene's beat = the paragraph nearest the read-line. This keeps the
+        // viz highlight locked to the paragraph you're actually reading (no
+        // continuous drift when paragraph heights differ), and hands off cleanly
+        // at the midpoint of each gap instead of flickering between beats.
+        const ps = [...b.querySelectorAll('p')];
+        if (ps.length > 1) {
+          let best = 0, bestd = Infinity;
+          ps.forEach((el, idx) => {
+            const rr = el.getBoundingClientRect();
+            const c = rr.top + rr.height / 2;
+            const d = Math.abs(c - readLine);
+            if (d < bestd) { bestd = d; best = idx; }
+          });
+          prog[i] = best / (ps.length - 1);
+        }
+      } else {
+        const denom = Math.max(1, r.height - vh);
+        // window-scroll equivalent of the original inner-scroller math,
+        // quantized to 1/24 steps so scrolling doesn't re-render the whole
+        // scene tree at 60fps (six imported scenes are too heavy for that).
+        const raw = Math.max(0, Math.min(1, (vh * 0.15 - r.top) / denom));
+        prog[i] = Math.round(raw * 24) / 24;
+      }
       if (r.top <= vh * 0.5 && r.top + r.height > vh * 0.5) active = i;
     });
     // past the last scene (tail in view): hold the last scene's end-state
