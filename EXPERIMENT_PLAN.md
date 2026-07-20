@@ -2011,11 +2011,34 @@ parity unaffected; service metrics are reward-independent so eval is apples-to-a
   the shaping it exploited). So **flat wins under both reward variants** — "flat is best" doesn't
   depend on the shaping. **Combined best policy: flat MLP + `RLEVATOR_SHAPING=off`**, beating LOOK
   decisively at M and L.
-- **Open follow-ups (need new env infra or a fresh direction — future session):** make no-shaping
-  the default (re-run the differential battery as the gate); further reward alignment (queue-
-  weighted penalty); and the plan's untested-in-tensor arcs — **E4 zoning** (port per-car
-  floorRange / Z-H rungs), stress intensity / other traffic patterns (parameterize like
-  RUNG/SHAPING), **E7 fleet generalization** (randomizeActive; RNG slots already reserved).
+- **Done since:** no-shaping is now the DEFAULT reward (§9.4), re-validated (battery green under
+  the new default; LOOK returns re-pinned per rung). Remaining untested-in-tensor arcs: stress
+  intensity / other patterns (parameterize like RUNG/SHAPING), **E7 fleet generalization**
+  (randomizeActive; RNG slots reserved), further reward alignment (queue-weighted penalty).
+
+### 9.5 Zoning (E4): ported & validated, but the experiment is deferred (2026-07-18)
+
+Per-car floor bands added to the tensor env (rungs **Z** = 30fl/8cars nested 0-14×2/0-22×3/0-29×3,
+**H** = 40fl/10cars; `CAR_MIN/MAX_FLOOR` per rung; movement + action mask + LOOK claiming all
+band-aware; non-zoned rungs bit-unchanged). **Differential battery green at Z (10/10)** — the port
+is correct and reusable. `models/`… none (not trained).
+
+**Why the E4 experiment is deferred, not run:** at the default intensity 1.0, rung Z is an
+**overload**, and it's ill-posed for a clean LOOK-vs-RL comparison for two reasons:
+1. Z carries L's full load (population 960) but only 3 of 8 cars serve the top half, so **LOOK
+   itself collapses**: delivered ~490 but **~192 abandoned** (vs 14.6 at L), waitP95 ~42 s (at the
+   45 s cap), rwTotal negative. Unity only ever ran Z at intensity ~0.0-0.1 (10-30× lighter); there
+   is no Unity Z@1.0 baseline.
+2. **Partial-observability wall:** neither LOOK nor RL sees a *waiting* passenger's destination
+   (default obs) and boarding is indiscriminate, so **neither can avoid mis-boarding** a rider into
+   a car that can't reach their floor. RL's only lever is routing, not boarding — so it cannot fix
+   the mechanism that breaks zoning. RL@Z@1.0 would give a muddy "both struggle" result, not a
+   clean win.
+
+**To do zoning *right* (future):** run Z at a viable lower intensity (parameterize intensity) AND
+add the destination/OD observation (E5/E13d) so mis-boarding is avoidable — then it's a real
+coordination test. The port is ready for that. Decision: **skipped for now** — the thesis's core
+claim (RL beats LOOK at scale) is already cleanly shown at M/L via §9.3-§9.4.
   - **Pattern @ M: flat wins; conv/percar/attn train to higher shaped-reward but deploy worse**
     (more abandonment / worse tail). At M (16 floors, 5 cars) a wide flat MLP already handles the
     problem; the structural priors cost expressiveness without a coordination payoff. Caveat: flat

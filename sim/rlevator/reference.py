@@ -15,7 +15,8 @@ import numpy as np
 from simulacrum import ReferenceEnv, rng
 
 from rlevator import (
-    AR_IN, AR_INTER, AR_OUT, BIN_SECONDS, CAPACITY, DOOR_TICKS, DWELL_TICKS,
+    AR_IN, AR_INTER, AR_OUT, BIN_SECONDS, CAPACITY, CAR_MAX_FLOOR, CAR_MIN_FLOOR,
+    DOOR_TICKS, DWELL_TICKS,
     DOORS_CLOSING, DOORS_OPENING, DWELLING, E, F, IDLE, INTENSITY, K_MAX,
     MAX_DECISIONS, MAX_POS, MAX_QUEUE, MAX_SUBTICKS, MAX_WAIT_TICKS,
     MIDDAY_BINS, MOVING, POPULATION, R_ABANDONED, R_AWAY, R_DELIVERED,
@@ -315,14 +316,14 @@ class RlevatorReference(ReferenceEnv):
             return
         f = st.pos[i] // UNITS_PER_FLOOR
         if cmd == 1:
-            # spec: Actions — up one floor; no-op at the top floor.
-            if f < F - 1:
+            # spec: Actions — up one floor; no-op at the car's top band floor.
+            if f < CAR_MAX_FLOOR[i]:
                 st.target[i] = f + 1
                 st.dir[i] = 1
                 st.car_state[i] = MOVING
         elif cmd == 2:
-            # spec: Actions — down one floor; no-op at the lobby.
-            if f > 0:
+            # spec: Actions — down one floor; no-op at the car's bottom band floor.
+            if f > CAR_MIN_FLOOR[i]:
                 st.target[i] = f - 1
                 st.dir[i] = -1
                 st.car_state[i] = MOVING

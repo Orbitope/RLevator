@@ -291,6 +291,12 @@ Seven integer accumulators, zeroed at the start of every step, summed over
 its 5 sub-ticks: `delivered`, `rejected`, `abandoned`, `toward_units`,
 `away_units` (rider·sub-units), `rider_ticks`, `queue_ticks`.
 
+**Default reward (EXPERIMENT_PLAN §9.4):** `R_TOWARD = R_AWAY = 0` — the
+toward/away movement shaping is OFF by default because it hurt deployed
+service quality (policies gamed it for reward). The `r_tow`/`r_awy` terms
+below stay in the expression (they just evaluate to 0), so bit-identity is
+unaffected. `RLEVATOR_SHAPING=on` restores the Unity-faithful ±0.4 weights.
+
 The step reward is the float64 expression, evaluated in exactly this order
 (mirrors Unity `CollectReward`; `0.0625 = 1/16` converts sub-units to
 floors, `0.1` converts ticks to seconds):

@@ -22,12 +22,14 @@ def harness_config():
     from rlevator import N_ACTIONS, RUNG
 
     # LOOK mean return over 20 episodes (base_seed 1000), pinned per rung — the
-    # deterministic guard against silent dynamics/reward drift. Add a rung's
-    # value once measured (RLEVATOR_RUNG=<r> pytest reports the actual mean).
+    # deterministic guard against silent dynamics/reward drift. Values are for
+    # the DEFAULT reward (no toward/away shaping, §9.4). (Shaped values, pre-§9.4:
+    # S 837.17 / M 1479.77 / L 2548.30 — used if RLEVATOR_SHAPING=on.)
     look_expected = {
-        "S": 837.1720500000081,
-        "M": 1479.7684,
-        "L": 2548.296999999994,
+        "S": 728.9308000000067,
+        "M": 1112.9284000000084,
+        "L": 1490.7670000000003,
+        "Z": 11.847799999999847,   # zoning overloads LOOK at intensity 1.0 (§E4)
     }
 
     return HarnessConfig(

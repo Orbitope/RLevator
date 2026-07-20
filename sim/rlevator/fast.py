@@ -16,7 +16,8 @@ import torch
 from simulacrum import BatchedEnv, invariant, rng
 
 from rlevator import (
-    AR_IN, AR_INTER, AR_OUT, BIN_SECONDS, CAPACITY, DOOR_TICKS, DWELL_TICKS,
+    AR_IN, AR_INTER, AR_OUT, BIN_SECONDS, CAPACITY, CAR_MAX_FLOOR, CAR_MIN_FLOOR,
+    DOOR_TICKS, DWELL_TICKS,
     DOORS_CLOSING, DOORS_OPENING, DWELLING, E, F, IDLE, INTENSITY, K_MAX,
     MAX_DECISIONS, MAX_POS, MAX_QUEUE, MAX_SUBTICKS, MAX_WAIT_TICKS,
     MIDDAY_BINS, MOVING, POPULATION, R_ABANDONED, R_AWAY, R_DELIVERED,
@@ -129,6 +130,9 @@ class RlevatorBatched(BatchedEnv):
         self.dcdf = dcdf.to(dev)
         self._start_pos = (torch.tensor(START_FLOORS, dtype=torch.int64, device=dev)
                            * _UPF).unsqueeze(0)                       # [1,E]
+        # per-car service bands (spec: zoning); full-building for non-zoned rungs.
+        self._car_max = torch.tensor(CAR_MAX_FLOOR, dtype=torch.int64, device=dev).view(1, E)
+        self._car_min = torch.tensor(CAR_MIN_FLOOR, dtype=torch.int64, device=dev).view(1, E)
         self._pow6 = torch.tensor([6 ** i for i in range(E)],
                                   dtype=torch.int64, device=dev)      # [E]
         self._aE = torch.arange(E, dtype=torch.int64, device=dev)
@@ -226,8 +230,9 @@ class RlevatorBatched(BatchedEnv):
         cmds = (actions.unsqueeze(-1) // self._pow6) % 6         # [N,E]
         idle = self.car_state == IDLE
         fl = self.pos // _UPF
-        up_ok = idle & (cmds == 1) & (fl < F - 1)
-        dn_ok = idle & (cmds == 2) & (fl > 0)
+        # spec: Actions — up/down bounded by each car's service band (zoning).
+        up_ok = idle & (cmds == 1) & (fl < self._car_max)
+        dn_ok = idle & (cmds == 2) & (fl > self._car_min)
         door = idle & (cmds >= 3)
         self.target = torch.where(up_ok, fl + 1, torch.where(dn_ok, fl - 1, self.target))
         self.dir = torch.where(up_ok, torch.ones_like(self.dir),

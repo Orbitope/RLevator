@@ -16,7 +16,10 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from rlevator import CAPACITY, E, F, IDLE, UNITS_PER_FLOOR
+from rlevator import CAPACITY, CAR_MAX_FLOOR, CAR_MIN_FLOOR, E, F, IDLE, UNITS_PER_FLOOR
+
+_CAR_MAX = torch.tensor(CAR_MAX_FLOOR).view(1, E)   # per-car band bounds (zoning)
+_CAR_MIN = torch.tensor(CAR_MIN_FLOOR).view(1, E)
 
 # Observation width (spec: Observations, blocks 1-7), rung-dependent:
 # carFloor(E*F)+carActive(E)+carButtons(E*F)+hallButtons(2F)+hallCallAge(2F)
@@ -41,9 +44,10 @@ def legal_mask(env) -> torch.Tensor:
     free = (env.rider_dest != -1).sum(-1) < CAPACITY           # [N,E]
 
     mask = torch.zeros(n, E, N_CAR_ACTIONS, dtype=torch.bool, device=dev)
+    cmax, cmin = _CAR_MAX.to(dev), _CAR_MIN.to(dev)            # per-car band (zoning)
     mask[..., 0] = True                                        # NOOP always legal
-    mask[..., 1] = idle & (fl < F - 1)                        # up
-    mask[..., 2] = idle & (fl > 0)                            # down
+    mask[..., 1] = idle & (fl < cmax)                         # up (within band)
+    mask[..., 2] = idle & (fl > cmin)                         # down (within band)
     mask[..., 3] = idle & (up_cnt > 0) & free                 # board up (only if room)
     mask[..., 4] = idle & (dn_cnt > 0) & free                 # board down (only if room)
     mask[..., 5] = idle & wants                                # unload

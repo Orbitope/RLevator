@@ -9,7 +9,9 @@ against.
 
 from __future__ import annotations
 
-from rlevator import CAPACITY, E, F, IDLE, MOVING, UNITS_PER_FLOOR
+from rlevator import (
+    CAPACITY, CAR_MAX_FLOOR, CAR_MIN_FLOOR, E, F, IDLE, MOVING, UNITS_PER_FLOOR,
+)
 
 
 def _riders(state: dict, i: int) -> list[int]:
@@ -61,7 +63,9 @@ def collective_look(state: dict) -> int:
             continue
         fl = _floor(state, i)
         best, bd = -1, None
-        for f in range(F):  # v1: every car serves the full building
+        # only claim hall calls within this car's service band (zoning; mirrors
+        # Unity CollectiveLook `for f = minFloor..maxFloor`).
+        for f in range(CAR_MIN_FLOOR[i], CAR_MAX_FLOOR[i] + 1):
             if state["up_count"][f] == 0 and state["down_count"][f] == 0:
                 continue
             if f in claimed:
