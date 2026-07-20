@@ -163,7 +163,7 @@
 
       <section style="padding:56px 0 8px;">
         <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">06 &#183; the setup</div>
-        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">One environment, two implementations</h2>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">The simulator, rebuilt in tensors</h2>
         <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">The simulation is turn-based underneath: passengers arrive by a Poisson process whose rate follows a 48-bin daily profile, queue per floor and direction (capacity 12, abandon after 45&#8202;s), and board capacity-8 cars. The policy acts every 0.5&#8202;s of simulated time &mdash; six discrete actions per car (idle, up, down, board-up, board-down, unload) &mdash; while the physics ticks at 0.1&#8202;s underneath: a semi-MDP with reward accumulated between decisions. Three building sizes carry the experiments:</p>
         <table class="rlv">
           <tr><th>rung</th><th>floors</th><th>cars</th><th>population</th><th>observation dim</th><th>joint actions</th></tr>
@@ -174,40 +174,55 @@
 
         <h3 style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--text-bright);margin:34px 0 0;">The traffic makes the problem</h3>
         <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">A dispatcher is only as interesting as the demand it faces, so the arrivals aren't a fixed schedule &mdash; they're a stochastic process with structure. Every tick, each floor draws a <strong style="color:var(--text-primary);">Poisson</strong> count of new passengers from a rate that follows a twelve-hour <strong style="color:var(--text-primary);">daily profile</strong> (48 fifteen-minute bins), and each new passenger draws a destination from an origin-dependent distribution. The profile is the sum of three overlapping demand components, and it's their balance over the day that produces the classic traffic patterns:</p>
-        <table class="rlv">
-          <tr><th>component</th><th>flow</th><th>peaks at</th><th>named pattern</th></tr>
-          <tr><td>incoming</td><td>lobby &#8594; upper floors</td><td>morning</td><td>up-peak</td></tr>
-          <tr><td>interfloor</td><td>upper &#8596; upper</td><td>midday</td><td class="hl">midday (used here)</td></tr>
-          <tr><td>outgoing</td><td>upper floors &#8594; lobby</td><td>evening</td><td>down-peak</td></tr>
-        </table>
+        <figure style="margin:20px 0 6px;">
+          <svg viewBox="0 0 840 250" role="img" aria-label="Daily elevator-demand profile: an incoming morning up-peak, a broad midday interfloor plateau, and an outgoing evening down-peak." style="width:100%;height:auto;display:block;">
+            <!-- axes -->
+            <line x1="70" y1="210" x2="810" y2="210" style="stroke:var(--border);stroke-width:1"/>
+            <line x1="70" y1="26" x2="70" y2="210" style="stroke:var(--border);stroke-width:1"/>
+            <text x="60" y="120" transform="rotate(-90 60 120)" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-anchor:middle;">ARRIVAL RATE</text>
+            <!-- x ticks -->
+            <text x="70"  y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">6a</text>
+            <text x="229" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">9a</text>
+            <text x="387" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">12p</text>
+            <text x="546" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">3p</text>
+            <text x="704" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">6p</text>
+            <text x="424" y="246" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-anchor:middle;">TIME OF DAY</text>
+            <!-- interfloor filled (the pattern trained on) -->
+            <path d="M70,210 70,196 85,193 101,190 116,186 132,182 147,177 162,173 178,167 193,162 209,156 224,149 240,143 255,136 270,130 286,123 301,117 317,110 332,105 348,99 363,95 378,91 394,88 409,85 425,84 440,83 455,84 471,85 486,88 502,91 517,95 532,99 548,105 563,110 579,117 594,123 610,130 625,136 640,143 656,149 671,156 687,162 702,167 718,173 733,177 748,182 764,186 779,190 795,193 810,196 810,210Z" style="fill:var(--amber);opacity:0.12"/>
+            <!-- incoming (up-peak, morning) -->
+            <polyline points="70,192 85,179 101,159 116,134 132,106 147,77 162,52 178,37 193,35 209,45 224,67 240,95 255,124 270,151 286,172 301,188 317,198 332,204 348,207 363,209 378,209 394,210 409,210 425,210 440,210 810,210" style="fill:none;stroke:var(--steel-bright);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- outgoing (down-peak, evening) -->
+            <polyline points="70,210 440,210 455,210 471,210 486,209 502,208 517,207 532,203 548,198 563,190 579,178 594,161 610,141 625,118 640,94 656,72 671,56 687,49 702,50 718,61 733,80 748,102 764,126 779,149 795,168 810,182" style="fill:none;stroke:var(--coral-bright);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- interfloor line on top (thicker, amber) -->
+            <polyline points="70,196 85,193 101,190 116,186 132,182 147,177 162,173 178,167 193,162 209,156 224,149 240,143 255,136 270,130 286,123 301,117 317,110 332,105 348,99 363,95 378,91 394,88 409,85 425,84 440,83 455,84 471,85 486,88 502,91 517,95 532,99 548,105 563,110 579,117 594,123 610,130 625,136 640,143 656,149 671,156 687,162 702,167 718,173 733,177 748,182 764,186 779,190 795,193 810,196" style="fill:none;stroke:var(--amber-bright);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- peak labels -->
+            <text x="193" y="26" style="fill:var(--steel-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">up-peak</text>
+            <text x="687" y="40" style="fill:var(--coral-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">down-peak</text>
+            <text x="440" y="72" style="fill:var(--amber-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">interfloor</text>
+          </svg>
+          <figcaption style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);">
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--steel-bright);display:inline-block;"></span>incoming &#183; lobby&#8594;upper</span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--amber-bright);display:inline-block;"></span>interfloor &#183; upper&#8596;upper <span style="color:var(--amber);">&#8226; trained on this slice</span></span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--coral-bright);display:inline-block;"></span>outgoing &#183; upper&#8594;lobby</span>
+          </figcaption>
+        </figure>
         <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">Origins are lobby-weighted &mdash; all incoming traffic starts at floor 0 &mdash; and destinations follow a matrix: from the lobby, roughly uniform across the upper floors; from an upper floor, split between &ldquo;back to the lobby&rdquo; and &ldquo;across to another upper floor.&rdquo; A single <em>intensity</em> knob scales the whole thing to a target load (population &times; a per-slot factor). The tensor experiments run the <strong style="color:var(--text-primary);">interfloor / midday</strong> slice at nominal load &mdash; deliberately the least forgiving regime for the agent's blind spot, since demand is spread across floors rather than funnelled through the lobby, so the cars can't just camp at the bottom. And because the RNG is counter-based, the same seed replays the <em>identical</em> passenger tape for every method, so LOOK and the learned policy are graded on the same people arriving at the same instants.</p>
 
-        <p style="font-size:15px;line-height:1.65;margin:26px 0 0;">I wrote the environment twice, on purpose: a slow, readable single-instance reference and a batched PyTorch implementation, both written from one spec, with a counter-based deterministic RNG so every random draw is a pure function of <span style="font-family:var(--font-mono);font-size:13px;">(seed, episode, step, slot)</span>. A differential test battery compares them state-by-state at <strong style="color:var(--text-primary);">zero tolerance</strong> &mdash; the state is all-integer by design, so there is nothing to be approximately right about. That discipline is what makes the rest of this page trustworthy: when a number moved, it was the experiment, not a drifting simulator.</p>
-        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">It's also fast. The batched environment plus the PPO learner runs at ~46,000 agent-steps/s on a laptop CPU &mdash; about <strong style="color:var(--amber);">37&#215;</strong> the Unity/ML-Agents pipeline it replaced, measured end-to-end on the same machine. A five-million-step training run takes two minutes. That iteration speed is why the experiments below exist at all.</p>
+        <h3 style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--text-bright);margin:38px 0 0;">What's actually running here</h3>
+        <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">This part matters for trusting the numbers, so let me be concrete. The elevator simulator began as a <strong style="color:var(--text-primary);">Unity</strong> project driven by ML-Agents &mdash; a full 3D build that steps one building at a time. For this work I rebuilt the entire simulation from scratch as a pure-Python <strong style="color:var(--text-primary);">tensor environment</strong>: identical rules and traffic, but the whole state lives in plain arrays, so hundreds of buildings step at once with no game engine in the loop. Every result on this page comes from that Python rebuild.</p>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">The payoff is speed. The tensor environment plus the PPO learner runs at ~46,000 agent-steps/s on a laptop CPU &mdash; about <strong style="color:var(--amber);">37&#215;</strong> the original Unity/ML-Agents pipeline, measured end-to-end on the same machine &mdash; so a five-million-step run drops from hours to roughly two minutes. That single change is why an experiment matrix this wide was even possible; the Unity build is now the thing I check against, not the thing I train in.</p>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">And to trust a rewrite you have to prove it matches, so I built the Python version <em>twice</em>: a slow, readable single-instance <span style="font-family:var(--font-mono);font-size:13px;">reference</span> and the fast batched one, both from a single spec, sharing a counter-based RNG so every random draw is a pure function of <span style="font-family:var(--font-mono);font-size:13px;">(seed, episode, step, slot)</span>. A differential-test battery steps the two side by side and compares every value at <strong style="color:var(--text-primary);">zero tolerance</strong> &mdash; the state is all-integer by design, so there is nothing to be approximately right about. When a number moves in the results below, it's the experiment that changed, not a drifting simulator.</p>
       </section>
 
       <section style="padding:56px 0 8px;">
-        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">07 &#183; the baseline</div>
-        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">How LOOK actually dispatches</h2>
-        <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">Everything on this page is measured against <strong style="color:var(--text-primary);">LOOK</strong> &mdash; collective control, the rule that runs most real elevator banks &mdash; so it's worth knowing exactly what it does. Each half-second it makes three decisions, in order:</p>
-        <ol style="font-size:15px;line-height:1.7;margin:16px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:10px;">
-          <li><strong style="color:var(--text-primary);">Each occupied car picks a target</strong> &mdash; the nearest floor one of its riders wants, preferring the direction it's already travelling (a floor ahead beats one behind). This is the &ldquo;sweep&rdquo;: a car keeps going one way, dropping people as it passes, and reverses only when nothing remains ahead. The name is borrowed from the disk-scheduling algorithm &mdash; SCAN rides to the end of the shaft, LOOK turns around the moment there's nothing further to serve.</li>
-          <li><strong style="color:var(--text-primary);">Each idle, empty car claims a hall call</strong> &mdash; the nearest floor with someone waiting, first-come by distance, with no two cars claiming the same call. This one step is the entire coordination story, and it is greedy and myopic: a car grabs whatever is closest to it <em>right now</em>, with no model of where the other cars are headed or who is about to arrive.</li>
-          <li><strong style="color:var(--text-primary);">Each car resolves to one action</strong> &mdash; unload if a rider wants this floor, board if there's a matching call here and room to take it, otherwise step toward its target, otherwise idle.</li>
-        </ol>
-        <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">No lookahead, no learned value, no anticipation of arrivals that haven't happened. And it's <em>very</em> good: in a small or lightly loaded building, &ldquo;answer the nearest call in the direction you're already going&rdquo; is close to optimal, which is exactly why RL only ties it at rung S. Where it leaves service on the table is coordination under load. Because assignment is greedy and per-car, cars <strong style="color:var(--text-primary);">bunch</strong> &mdash; two drift toward the same busy region while a third zone goes unanswered &mdash; and nothing positions a car for demand it can predict but hasn't seen yet. That gap widens as the building grows, which is why the RL margin grows with it.</p>
-        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">There is a stronger classical cousin &mdash; cost-function dispatch (Otis's &ldquo;relative system response&rdquo;, or an ETA estimate): same idea, but a hall call goes to the car with the lowest <em>estimated time to serve it</em> &mdash; travel time plus a penalty for each stop it would pass through &mdash; with sticky assignments so cars don't thrash. It's the commercial workhorse and a tougher opponent, but it's still a hand-tuned, one-call-at-a-time heuristic. LOOK is the honest floor, and the ruler every number here is held against.</p>
-      </section>
-
-      <section style="padding:56px 0 8px;">
-        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">08 &#183; training &amp; evaluation</div>
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">07 &#183; training &amp; evaluation</div>
         <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">Same ruler for everyone</h2>
         <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">The trainer is PPO with one categorical head per car and action masking &mdash; a car mid-travel can only no-op; boarding is masked when the car is full. Observations are normalized online; entropy is annealed to zero over training and the best checkpoint by episode return is kept. Two details earned their place the hard way: evaluation is <em>greedy</em> (argmax, matching how deterministic dispatchers run), and a slightly under-converged stochastic policy can look competent while its argmax parks a full car on a legal no-op forever. Masking board-when-full and annealing entropy gently removed that failure on every seed. I also tried a value-based D3QN &mdash; natively greedy, perfectly robust, and ~1.7&#215; LOOK's mean wait; PPO stayed.</p>
         <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">Networks: 256&#215;2 at S, 768&#215;4 at M and L (the structured variants below use 512&#215;3). Budgets: 5M steps at S (parity with the original Unity run), 10&ndash;15M at M/L. Evaluation protocol, identical for every method including LOOK: 3,600&#8202;s episodes with a 300&#8202;s warmup, seeds 1&ndash;5, identical traffic per seed, wait statistics over delivered passengers with p95 from a 64-bin histogram. <strong style="color:var(--text-primary);">Every RL number on this page is stated relative to LOOK on the same traffic tape.</strong></p>
       </section>
 
       <section style="padding:56px 0 8px;">
-        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">09 &#183; findings</div>
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">08 &#183; findings</div>
         <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">The network didn't matter. The objective did.</h2>
 
         <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">Headline first &mdash; final policy (flat MLP, unshaped reward) versus LOOK, per building size, means over the five seeds:</p>
@@ -222,6 +237,10 @@
         </table>
         <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Exactly the shape the thesis predicted: a tie where the heuristic is already near-optimal, a clear win once there's coordination to exploit &mdash; <strong style="color:var(--amber);">&minus;25% mean wait and zero abandonment at M</strong>, more delivered with a fraction of the abandonment at L.</p>
 
+        <div style="margin:26px 0 0;padding:16px 18px;border-left:2px solid var(--amber);background:var(--surface);border-radius:0 4px 4px 0;">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;">shaped vs. unshaped reward</div>
+          <p style="font-size:14.5px;line-height:1.6;margin:0;color:var(--text-secondary);">The reward has seven terms (scene&#160;02). <strong style="color:var(--text-primary);">Shaped</strong> is the original design: it includes a small <strong style="color:var(--amber);">&plusmn;0.4</strong>-per-floor bonus/penalty for a loaded car moving <em>toward</em> (or away from) a rider's destination &mdash; a hint that pays the agent for <em>looking like progress</em>, before anyone is actually delivered. <strong style="color:var(--text-primary);">Unshaped</strong> deletes those two movement terms, so the agent is paid only for real outcomes: deliveries, time spent waiting and riding, and the abandon / reject penalties. Every other coefficient is identical. That one difference is the whole experiment below.</p>
+        </div>
         <p style="font-size:15px;line-height:1.65;margin:26px 0 0;">Now the part I got wrong. I built four architectures expecting structure to win at scale. Measured at M under the original (shaped) reward:</p>
         <table class="rlv">
           <tr><th>architecture</th><th>training return</th><th>wait mean (s)</th><th>wait p95 (s)</th><th>abandoned</th></tr>
@@ -244,11 +263,11 @@
       </section>
 
       <section style="padding:56px 0 8px;">
-        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">10 &#183; limitations</div>
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">09 &#183; limitations</div>
         <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">What these numbers don't claim</h2>
         <ul style="font-size:15px;line-height:1.7;margin:18px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:10px;">
           <li>The Python environment is a <em>semantic</em> port of the original Unity simulator &mdash; statistically matched (the LOOK baseline reproduces the Unity harness within noise), not bit-identical. Same distributions, different random streams.</li>
-          <li>The observation is destination-blind, like a real hall call. That's realism, but it also means the zoned-fleet experiment &mdash; the configuration where RL should shine brightest &mdash; isn't a fair test yet: with restricted cars, <em>no</em> policy can avoid boarding a passenger it can't deliver. The zoned environment is built and validated; running it honestly needs destination-aware observations first.</li>
+          <li>The observation is destination-blind by design &mdash; the agent sees that people are waiting and for how long, never where they want to go, exactly like a real hall call. That's realistic, but it also caps the ceiling: no policy can pre-position for demand it can't see, so some of the gap that stays open at scale is baked into the inputs, not the network.</li>
           <li>Tensor-pipeline results cover the interfloor (midday) traffic pattern at nominal intensity. Other patterns and stress loads were only baselined in the earlier Unity phase.</li>
           <li>Budgets are laptop-CPU sized: five seeds per cell, one building geometry per rung, no hyperparameter sweeps. The deltas are consistent across every seed, but these are workstation experiments, not a benchmark suite.</li>
           <li>Reward totals are only comparable within a reward preset &mdash; shaped and unshaped policies optimize different objectives. Service metrics (wait, delivered, abandoned) are directly comparable everywhere.</li>
@@ -256,10 +275,10 @@
       </section>
 
       <section style="padding:56px 0 8px;">
-        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">11 &#183; what's next &amp; resources</div>
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">10 &#183; what's next &amp; resources</div>
         <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">Where this goes</h2>
         <ul style="font-size:15px;line-height:1.7;margin:18px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:8px;">
-          <li>Zoning, done right: destination-aware observations (the destination-dispatch premise) plus calibrated load, on the already-validated zoned buildings.</li>
+          <li>Give the agent destination information (the destination-dispatch premise) and measure how much of the remaining gap the blind spot was actually costing.</li>
           <li>Day-cycle and stress-intensity traffic through the fast pipeline, where each run is minutes instead of hours.</li>
           <li>Further objective alignment &mdash; the shaping deletion suggests the remaining coefficients deserve the same scrutiny.</li>
         </ul>
