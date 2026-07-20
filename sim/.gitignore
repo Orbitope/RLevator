@@ -1,0 +1,8 @@
+# trained model binaries — reproducible from the documented train.py commands
+models/
+*.pt
+
+# python / pytest caches
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -134,7 +134,10 @@ namespace ElevatorRL
             bool allInOne = traffic.useDayCycle;
             TrafficPattern want = allInOne ? traffic.PatternForTime(simTime) : traffic.defaultPattern;
             ActivePattern = want;
-            arrivals.LoadPatternAtTime(want, allInOne, simTime, traffic.population);
+            // V0: population derived from fleet carrying capacity so every rung sits at the paper's
+            // ~loadPerSlot arrivals/slot with no per-rung asset juggling (S=360, M=600, L=960, H=1200).
+            int population = cfg.numElevators * cfg.capacity * traffic.loadPerSlot;
+            arrivals.LoadPatternAtTime(want, allInOne, simTime, population);
         }
 
         void SpawnArrivals(float dt)

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    @keyframes ckPop { 0% { r: 0; opacity: 0; } 60% { opacity: 1; } 100% { opacity: 0.9; } }
+  </style>
+</helmet>
+<div data-screen-label="Reward" style="display:flex;flex-direction:column;width:100%;height:100vh;min-height:620px;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:flex-start;justify-content:space-between;flex:0 0 auto;padding:16px 26px 14px;border-bottom:1px solid var(--border);">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">Reward &#183; how well it serves people</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--text-bright);margin-top:2px;">One scalar, seven forces</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:24px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">step</span>
+        <span style="font-family:var(--font-mono);font-size:16px;color:var(--text-primary);font-variant-numeric:tabular-nums;margin-top:2px;">{{ stepLabel }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">cumulative reward</span>
+        <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:{{ totalColor }};font-variant-numeric:tabular-nums;line-height:1;margin-top:2px;">{{ totalLabel }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+    <!-- priority panel -->
+    <aside style="width:306px;flex:0 0 auto;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 20px 6px;"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">one-time events</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:8px 20px 16px;">
+        <sc-for list="{{ eventBars }}" as="b" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);width:82px;flex:0 0 auto;">{{ b.label }}</span>
+            <div style="flex:1;height:15px;position:relative;background:var(--void);border-radius:2px;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--border);"></div><div style="{{ b.barStyle }}"></div></div>
+            <span style="font-family:var(--font-mono);font-size:11px;color:{{ b.valColor }};font-variant-numeric:tabular-nums;width:38px;text-align:right;flex:0 0 auto;">{{ b.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:8px 20px 6px;border-top:1px solid var(--border);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">continuous drains &#183; per second</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:8px 20px 12px;">
+        <sc-for list="{{ drainBars }}" as="b" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);width:82px;flex:0 0 auto;">{{ b.label }}</span>
+            <div style="flex:1;height:15px;position:relative;background:var(--void);border-radius:2px;overflow:hidden;"><div style="{{ b.barStyle }}"></div></div>
+            <span style="font-family:var(--font-mono);font-size:11px;color:{{ b.valColor }};font-variant-numeric:tabular-nums;width:44px;text-align:right;flex:0 0 auto;">{{ b.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin:0 20px 18px;padding:10px 12px;background:var(--coral-wash);border:1px solid var(--border);border-left:2px solid var(--coral);border-radius:4px;">
+        <span style="font-family:var(--font-body);font-size:12px;line-height:1.45;color:var(--text-secondary);">Waiting in the hall costs <strong style="color:var(--coral-bright);font-weight:600;">3&#215;</strong> as much as riding &mdash; so the agent is pushed hard to pick people up fast.</span>
+      </div>
+    </aside>
+
+    <!-- episode streamgraph -->
+    <section style="flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 22px 8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">one episode &#183; contribution to reward over time</span>
+        <div style="display:flex;gap:14px;">
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="6"><span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:2px;background:{{ l.color }};"></span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">{{ l.label }}</span></span></sc-for>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:8px;">
+        <svg viewBox="0 0 900 430" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+          <line x1="56" y1="{{ baselineY }}" x2="884" y2="{{ baselineY }}" stroke="var(--text-muted)" stroke-width="1"></line>
+          <sc-for list="{{ bands }}" as="b" hint-placeholder-count="6"><path d="{{ b.path }}" fill="{{ b.color }}" fill-opacity="0.82" stroke="none"></path></sc-for>
+          <path d="{{ netPath }}" fill="none" stroke="var(--text-bright)" stroke-width="2" stroke-linejoin="round"></path>
+          <sc-for list="{{ pops }}" as="p" hint-placeholder-count="0"><circle cx="{{ p.x }}" cy="{{ p.y }}" r="{{ p.r }}" fill="var(--amber-bright)" fill-opacity="{{ p.opacity }}"></circle></sc-for>
+          <text x="60" y="{{ posLabelY }}" fill="#7D9A6A" font-family="var(--font-mono)" font-size="12">good &#8593;</text>
+          <text x="60" y="{{ negLabelY }}" fill="#C47A5A" font-family="var(--font-mono)" font-size="12">cost &#8595;</text>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-body);font-size:13px;line-height:1.45;color:var(--text-secondary);margin-top:9px;min-height:38px;max-width:74ch;">{{ caption }}</div>
+    </section>
+  </main>
+
+  <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+    <footer style="display:flex;align-items:center;gap:14px;flex:0 0 auto;padding:11px 22px;border-top:1px solid var(--border);background:var(--surface);">
+      <button onClick="{{ togglePlay }}" style="{{ playStyle }}">{{ playLabel }}</button>
+      <button onClick="{{ restart }}" style="{{ ctrlStyle }}">RESTART</button>
+      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="{{ progStyle }}"></div></div>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);font-variant-numeric:tabular-nums;">{{ progLabel }}</span>
+    </footer>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:800},&quot;progress&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Scrollytelling&quot;},&quot;captureMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Recording&quot;}}">
+class Component extends DCLogic {
+  C = { delivered: 10, toward: 0.4, away: -0.4, abandoned: -8, rejected: -5, inElevator: -0.04, inQueue: -0.12 };
+  N = 110;
+  COLORS = { del: '#C49A3C', tw: '#7D9A6A', aw: '#6B7A8D', el: '#4E5A68', q: '#C47A5A', ev: '#FF5E3A' };
+
+  state = { t: 0, playing: true };
+
+  constructor(props) {
+    super(props);
+    this.precompute();
+  }
+  componentDidMount() {
+    if (this.props.progress == null && this.state.playing) this.startAuto();
+    if (typeof window !== 'undefined') window.rewardViz = { seek: (f) => this.seek(f), play: () => this.play(), pause: () => this.pause() };
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  pois(r, m) { if (m <= 0) return 0; let L = Math.exp(-m), k = 0, p = 1; do { k++; p *= r(); } while (p > L); return k - 1; }
+
+  precompute() {
+    const r = this.rng(7); const N = this.N; const C = this.C;
+    // one episode: calm, then congestion builds in the last third so penalties bite
+    const del = [], tw = [], aw = [], el = [], q = [], ev = [];
+    for (let i = 0; i < N; i++) {
+      const warm = Math.min(1, i / 8);
+      const congest = i > 68 ? Math.min(1, (i - 68) / 38) : 0;
+      del.push(this.pois(r, 0.6 * warm * (1 - 0.45 * congest)));
+      tw.push(1.3 * (0.6 + 0.8 * r()));
+      aw.push(0.32 * (0.6 + 0.8 * r()));
+      el.push(Math.max(0, 6 * warm * (0.8 + 0.4 * r())));
+      q.push(Math.max(0, (4.5 + 13 * congest) * (0.8 + 0.4 * r())));
+      ev.push({ ab: this.pois(r, congest * 0.5), rj: this.pois(r, congest * 0.6) });
+    }
+    // cumulative signed reward contributions
+    const cDel = [], cTw = [], cAw = [], cEl = [], cQ = [], cEv = [], net = [];
+    let aDel = 0, aTw = 0, aAw = 0, aEl = 0, aQ = 0, aEv = 0;
+    this.deliveries = [];
+    for (let i = 0; i < N; i++) {
+      aDel += C.delivered * del[i];
+      aTw += C.toward * tw[i];
+      aAw += -C.away * aw[i];        // stored as positive magnitude of the (negative) cost
+      aEl += -C.inElevator * el[i];
+      aQ += -C.inQueue * q[i];
+      aEv += -(C.abandoned * ev[i].ab + C.rejected * ev[i].rj);
+      cDel.push(aDel); cTw.push(aTw); cAw.push(aAw); cEl.push(aEl); cQ.push(aQ); cEv.push(aEv);
+      net.push(aDel + aTw - aAw - aEl - aQ - aEv);
+      if (del[i] > 0) this.deliveries.push({ i, n: del[i] });
+    }
+    this.arr = { cDel, cTw, cAw, cEl, cQ, cEv, net };
+    this.maxPos = cDel[N - 1] + cTw[N - 1];
+    this.maxNeg = cAw[N - 1] + cEl[N - 1] + cQ[N - 1] + cEv[N - 1];
+  }
+
+  startAuto() { clearInterval(this.timer); this.timer = setInterval(() => {
+    this.setState((s) => ({ t: Math.min(this.N - 1, s.t + 1) }), () => { if (this.state.t >= this.N - 1) this.pause(); });
+  }, 200); }
+  play = () => this.setState({ playing: true }, () => this.startAuto());
+  pause = () => { clearInterval(this.timer); this.setState({ playing: false }); };
+  togglePlay = () => { if (this.state.playing) this.pause(); else { if (this.state.t >= this.N - 1) this.setState({ t: 0 }); this.play(); } };
+  restart = () => this.setState({ t: 0, playing: true }, () => this.startAuto());
+  seek = (f) => { this.pause(); this.setState({ t: Math.round(Math.max(0, Math.min(1, f)) * (this.N - 1)) }); };
+
+  renderVals() {
+    const N = this.N; const A = this.arr;
+    let t = this.state.t;
+    if (this.props.progress != null && Number.isFinite(+this.props.progress)) t = Math.round(Math.max(0, Math.min(1, +this.props.progress)) * (N - 1));
+
+    const X0 = 56, X1 = 884, Y0 = 16, Y1 = 400;
+    const total = this.maxPos + this.maxNeg || 1;
+    const S = (Y1 - Y0) / total;
+    const yB = Y0 + this.maxPos * S;
+    const xAt = (i) => X0 + (i / (N - 1)) * (X1 - X0);
+    const yAt = (v) => yB - v * S;
+
+    // stacked band boundaries (signed reward space)
+    const topOf = {
+      del: (i) => [0, A.cDel[i]],
+      tw: (i) => [A.cDel[i], A.cDel[i] + A.cTw[i]],
+      aw: (i) => [-A.cAw[i], 0],
+      el: (i) => [-(A.cAw[i] + A.cEl[i]), -A.cAw[i]],
+      q: (i) => [-(A.cAw[i] + A.cEl[i] + A.cQ[i]), -(A.cAw[i] + A.cEl[i])],
+      ev: (i) => [-(A.cAw[i] + A.cEl[i] + A.cQ[i] + A.cEv[i]), -(A.cAw[i] + A.cEl[i] + A.cQ[i])],
+    };
+    const bandPath = (fn) => {
+      let up = 'M ' + xAt(0).toFixed(1) + ' ' + yAt(fn(0)[1]).toFixed(1);
+      for (let i = 1; i <= t; i++) up += ' L ' + xAt(i).toFixed(1) + ' ' + yAt(fn(i)[1]).toFixed(1);
+      for (let i = t; i >= 0; i--) up += ' L ' + xAt(i).toFixed(1) + ' ' + yAt(fn(i)[0]).toFixed(1);
+      return up + ' Z';
+    };
+    const order = [['del', this.COLORS.del], ['tw', this.COLORS.tw], ['aw', this.COLORS.aw], ['el', this.COLORS.el], ['q', this.COLORS.q], ['ev', this.COLORS.ev]];
+    const bands = order.map(([k, color]) => ({ key: k, color, path: bandPath(topOf[k]) }));
+
+    let netPath = 'M ' + xAt(0).toFixed(1) + ' ' + yAt(A.net[0]).toFixed(1);
+    for (let i = 1; i <= t; i++) netPath += ' L ' + xAt(i).toFixed(1) + ' ' + yAt(A.net[i]).toFixed(1);
+
+    const pops = this.deliveries.filter((d) => d.i <= t && d.i > t - 12).map((d) => {
+      const age = (t - d.i) / 12;
+      return { key: d.i, x: xAt(d.i).toFixed(1), y: yAt(topOf.del(d.i)[1]).toFixed(1), r: (2 + d.n * 1.5).toFixed(1), opacity: (1 - age * 0.85).toFixed(2) };
+    });
+
+    // priority bars
+    const evMax = 10, drMax = 0.15;
+    const mkBar = (v, max, coral) => {
+      const frac = Math.min(1, Math.abs(v) / max) * 50;
+      const positive = v >= 0;
+      return { position: 'absolute', top: '2px', bottom: '2px', left: positive ? '50%' : (50 - frac) + '%', width: frac + '%', background: coral ? 'var(--coral)' : (positive ? 'var(--amber)' : 'var(--steel)'), borderRadius: '1px' };
+    };
+    const eventBars = [
+      { key: 'del', label: 'delivered', v: 10 },
+      { key: 'tw', label: 'moved toward', v: 0.4 },
+      { key: 'aw', label: 'moved away', v: -0.4 },
+      { key: 'rj', label: 'rejected', v: -5 },
+      { key: 'ab', label: 'abandoned', v: -8, coral: true },
+    ].map((x) => ({ key: x.key, label: x.label, value: (x.v > 0 ? '+' : '') + x.v, valColor: x.coral ? 'var(--coral-bright)' : (x.v > 0 ? 'var(--amber)' : 'var(--steel-bright)'), barStyle: mkBar(x.v, evMax, x.coral) }));
+    const drainBars = [
+      { key: 'q', label: 'in queue', v: -0.12 },
+      { key: 'el', label: 'in elevator', v: -0.04 },
+    ].map((x) => ({ key: x.key, label: x.label, value: x.v.toFixed(2), valColor: 'var(--steel-bright)', barStyle: mkBar(x.v, drMax, false) }));
+
+    const legend = [
+      { key: 'del', label: 'delivered', color: this.COLORS.del },
+      { key: 'tw', label: 'toward', color: this.COLORS.tw },
+      { key: 'aw', label: 'away', color: this.COLORS.aw },
+      { key: 'el', label: 'riding', color: this.COLORS.el },
+      { key: 'q', label: 'waiting', color: this.COLORS.q },
+      { key: 'ev', label: 'abandon/reject', color: this.COLORS.ev },
+    ];
+
+    const frac = t / (N - 1);
+    let caption;
+    if (frac < 0.28) caption = 'Delivering is the big prize: every passenger dropped at their floor adds +10. The bold line is the running score.';
+    else if (frac < 0.55) caption = 'Underneath, two costs drip every single second \u2014 riders in transit and, more heavily, people still waiting in the hall.';
+    else if (frac < 0.78) caption = 'Notice the waiting band (terra) growing faster than the riding band: hall time is penalised 3\u00d7 harder.';
+    else caption = 'As traffic overwhelms the cars, coral spikes appear \u2014 people abandoning the queue (\u22128) and arrivals rejected (\u22125). The score stalls.';
+
+    const netNow = A.net[t];
+    const ctrlStyle = { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', padding: '7px 11px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-secondary)' };
+    return {
+      stepLabel: t, totalLabel: (netNow >= 0 ? '+' : '') + netNow.toFixed(0), totalColor: netNow >= 0 ? 'var(--amber-bright)' : 'var(--coral-bright)',
+      baselineY: yB.toFixed(1), bands, netPath, pops,
+      posLabelY: (Y0 + 14).toFixed(0), negLabelY: (Y1 - 6).toFixed(0),
+      eventBars, drainBars, legend, caption,
+      togglePlay: this.togglePlay, restart: this.restart, playLabel: this.state.playing ? 'PAUSE' : 'PLAY', ctrlStyle,
+      playStyle: { ...ctrlStyle, minWidth: '64px', background: this.state.playing ? 'var(--raised)' : 'var(--amber)', color: this.state.playing ? 'var(--amber-bright)' : 'var(--void)', borderColor: 'var(--amber)', fontWeight: this.state.playing ? 400 : 600 },
+      progStyle: { height: '100%', width: (frac * 100) + '%', background: 'var(--amber)', transition: 'width 180ms linear' },
+      progLabel: t + ' / ' + (N - 1),
+      showRail: !(this.props.captureMode ?? false) && this.props.progress == null,
+    };
+  }
+}
+</script>
+</body>
+</html>

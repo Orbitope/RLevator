@@ -17,14 +17,17 @@ namespace ElevatorRL
         [Tooltip("Global arrival-rate multiplier (the 'traffic' slider).")]
         [Range(0f, 4f)] public float intensity = 1.0f;
 
-        [Tooltip("EXPERIMENT_PLAN.md E15. Building population, used by the paper's inter-arrival " +
-            "formula: arrivals/sec = ar * population / 30000. The 2024 paper uses 1200 for a 20-floor " +
-            "building with 4 cars x capacity 20 (= 80 carrying slots), giving ~1,009-1,612 arrivals/hr " +
-            "= ~16 arrivals/hr per slot. Rung M has 5 cars x capacity 8 (= 40 slots), i.e. HALF their " +
-            "carrying capacity, so 600 reproduces their load-per-slot. (The old hand-tuned lambdas ran " +
-            "~8,640/hr = 216/hr/slot -- 13.3x more loaded, which is why 'sweep continuously' i.e. LOOK " +
-            "was near-optimal and RL had nothing to exploit.) Scale this with fleet capacity, not floors.")]
-        [Min(1)] public int population = 600;
+        [Tooltip("EXPERIMENT_PLAN.md V0. Building population is DERIVED per rung from fleet carrying " +
+            "capacity: population = numElevators * capacity * loadPerSlot (see Building.UpdatePattern). " +
+            "This feeds the paper's inter-arrival formula (arrivals/sec = ar * population / 30000). The " +
+            "2024 paper uses population 1200 for a 20-floor / 4-car / cap-20 building (= 80 carrying " +
+            "slots), i.e. ~15 people per slot, giving ~1,009-1,612 arrivals/hr = ~16/hr per slot. " +
+            "Deriving from capacity auto-calibrates every rung to that load-per-slot with no per-rung " +
+            "asset juggling (S=360, M=600, L=960, H=1200 population). loadPerSlot=15 reproduces the " +
+            "paper; the `intensity` slider above then supplies the nominal(1.0)/stress(1.5) load points. " +
+            "(The old hand-tuned lambdas ran ~216/hr/slot -- 13.3x overloaded -- which is why 'sweep " +
+            "continuously' i.e. LOOK was near-optimal and RL had nothing to exploit.)")]
+        [Min(1)] public int loadPerSlot = 15;
 
         [Header("Pattern")]
         public TrafficPattern defaultPattern = TrafficPattern.UpPeak;

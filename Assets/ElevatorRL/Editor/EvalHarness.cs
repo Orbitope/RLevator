@@ -500,6 +500,62 @@ namespace ElevatorRL.Editor
                 sweepName: "E1-full");
         }
 
+        // EXPERIMENT_PLAN.md V0: heuristic re-baseline on the REWRITTEN traffic generator (E15/V0).
+        // Load is now derived per rung from fleet capacity (TrafficConfig.loadPerSlot=15), so intensity
+        // 1.0 = the calibrated NOMINAL point (~13/slot) and 1.5 = STRESS (~20/slot). Includes Midday
+        // (pure interfloor) which the old E1 sweep omitted. Gate: nominal util < ~0.85 and abandon
+        // < ~15% (solvable-but-nontrivial), stress meaningfully harder. Writes the full metric panel
+        // (delivered/waitMean/waitP95/waitMax/abandoned/abandonRate/util/rwTotal).
+        // V1/V2 headline: PPO baseline (bignet2 recipe, flat MLP, no arch changes) trained fresh on
+        // the REWRITTEN traffic generator, rung M, Midday (pure interfloor) pattern, nominal load
+        // (intensity 1.0) — the exact regime V0's LOOK/ETA numbers were measured in. This is the
+        // first "does RL beat the heuristics" comparison on the corrected, non-degenerate environment.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday, nominal load, new traffic)")]
+        static void RunV2SweepMMidday() => RunScaleLadderSweep("V2-M-midday", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-midday-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung S, midday, nominal load, new traffic)")]
+        static void RunV2SweepSMidday() => RunScaleLadderSweep("V2-S-midday", 8, 3, 8,
+            "Assets/ElevatorRL/Models/elev-v2-s-midday-01.onnx", obsSize: 98,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
+        // 10M steps (extended from 5M -- reward was still climbing at the 5M cutoff, unlike S/M).
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung L, midday, nominal load, new traffic, 10M)")]
+        static void RunV2SweepLMidday() => RunScaleLadderSweep("V2-L-midday", 30, 8, 8,
+            "Assets/ElevatorRL/Models/elev-v2-l-midday-01.onnx", obsSize: 648,
+            pattern: TrafficPattern.Midday, intensity: 1.0f);
+
+        // V0/V2 stress load point (intensity 1.5), completing the nominal/stress pair at S and M.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung S, midday, STRESS load, new traffic)")]
+        static void RunV2SweepSMiddayStress() => RunScaleLadderSweep("V2-S-midday-stress", 8, 3, 8,
+            "Assets/ElevatorRL/Models/elev-v2-s-midday-stress-01.onnx", obsSize: 98,
+            pattern: TrafficPattern.Midday, intensity: 1.5f);
+
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday, STRESS load, new traffic)")]
+        static void RunV2SweepMMiddayStress() => RunScaleLadderSweep("V2-M-midday-stress", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-midday-stress-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.Midday, intensity: 1.5f);
+
+        // Pattern coverage: rung M, UpPeak (the only pattern tested for most of this project's
+        // history pre-E12/E15), nominal load, on the corrected traffic.
+        [MenuItem("Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, UpPeak, nominal load, new traffic)")]
+        static void RunV2SweepMUpPeak() => RunScaleLadderSweep("V2-M-uppeak", 16, 5, 8,
+            "Assets/ElevatorRL/Models/elev-v2-m-uppeak-01.onnx", obsSize: 254,
+            pattern: TrafficPattern.UpPeak, intensity: 1.0f);
+
+        [MenuItem("Tools/Elevator RL/V0 Re-baseline Sweep (LOOK/ETA, S-M-L x patterns x nominal+stress)")]
+        static void RunV0Rebaseline()
+        {
+            RunSweep(
+                presetNames: new[] { "S", "M", "L" },
+                patterns: new[] { TrafficPattern.UpPeak, TrafficPattern.DownPeak, TrafficPattern.Lunch, TrafficPattern.Midday },
+                intensities: new[] { 1.0f, 1.5f },
+                seeds: new[] { 1, 2, 3 },
+                totalSeconds: 3600f, warmupSeconds: 300f, bucketSeconds: 300f,
+                sweepName: "V0-rebaseline");
+        }
+
         static Dictionary<string, BuildingConfig> LoadPresets(string[] presetNames)
         {
             var presets = new Dictionary<string, BuildingConfig>();

@@ -1,0 +1,261 @@
+/* ============================================================
+   ContentKit — Foundations: Color + Type
+   Palette B — Charcoal + Amber + Coral.
+
+   A presentation layer for technical YouTube content
+   (ML / gamedev / conceptual explanation). The system frames
+   the work; it does not perform. All color is semantic.
+
+   Values mirror the shipped Unity package (Runtime/CKColor.cs)
+   EXACTLY — this CSS is the web-side transcription of the
+   ground-truth C# tokens. Do not drift from these hex values.
+   ============================================================ */
+
+/* Fonts are self-hosted from fonts/ (uploaded by the brand owner).
+   Paths resolve relative to THIS file (project root), so every consumer —
+   preview cards, UI kits, slides — gets them through one @import.
+     Rajdhani      — display / title cards (static weights 300–700)
+     Inter         — body / annotation (variable opsz/wght)
+     JetBrains Mono — data, code, HUD fields (variable wght) */
+
+/* ---- Rajdhani (display) — static weights ---- */
+@font-face { font-family: 'Rajdhani'; font-style: normal; font-weight: 300;
+  font-display: swap; src: url('fonts/Rajdhani-Light.ttf') format('truetype'); }
+@font-face { font-family: 'Rajdhani'; font-style: normal; font-weight: 400;
+  font-display: swap; src: url('fonts/Rajdhani-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Rajdhani'; font-style: normal; font-weight: 500;
+  font-display: swap; src: url('fonts/Rajdhani-Medium.ttf') format('truetype'); }
+@font-face { font-family: 'Rajdhani'; font-style: normal; font-weight: 600;
+  font-display: swap; src: url('fonts/Rajdhani-SemiBold.ttf') format('truetype'); }
+@font-face { font-family: 'Rajdhani'; font-style: normal; font-weight: 700;
+  font-display: swap; src: url('fonts/Rajdhani-Bold.ttf') format('truetype'); }
+
+/* ---- Inter (body) — variable opsz + wght ---- */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900;
+  font-display: swap; src: url('fonts/Inter-VariableFont_opsz_wght.ttf') format('truetype'); }
+@font-face { font-family: 'Inter'; font-style: italic; font-weight: 100 900;
+  font-display: swap; src: url('fonts/Inter-Italic-VariableFont_opsz_wght.ttf') format('truetype'); }
+
+/* ---- JetBrains Mono (data / code) — variable wght ---- */
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800;
+  font-display: swap; src: url('fonts/JetBrainsMono-VariableFont_wght.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: italic; font-weight: 100 800;
+  font-display: swap; src: url('fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype'); }
+
+:root {
+  /* ---------- BACKGROUNDS / SURFACES & DEPTH ----------
+     Warm near-black charcoal. Nothing floats: elements sit on
+     surfaces, surfaces sit in the void. */
+  --void:     #111009;   /* deep background — camera clear color */
+  --surface:  #1E1C16;   /* panel / card base */
+  --raised:   #2C2A22;   /* elevated element */
+  --border:   #3D3A30;   /* border / divider / 1px structure line */
+
+  /* ---------- TEXT ----------
+     Warm off-white ramp. TextBright is for primary labels only. */
+  --text-bright:    #EDE8DC;   /* primary label / title — sparing */
+  --text-primary:   #C8C0AE;   /* body emphasis / graph titles */
+  --text-secondary: #9A9484;   /* annotation / subtitle body */
+  --text-muted:     #6A6358;   /* chapter label / axis ticks / footnote */
+
+  /* ---------- AMBER — ACTIVITY ----------
+     The current focus, the live value, the thing being discussed.
+     HUD data fields use Amber. */
+  --amber-dark:   #2A1E08;   /* amber wash / region fill base */
+  --amber:        #C49A3C;   /* default amber */
+  --amber-bright: #E8C068;   /* highlight / rim light / hot value */
+
+  /* ---------- STEEL — STRUCTURE ----------
+     Scaffolding, secondary geometry, the cool fill light.
+     This replaces the old brief's "teal". */
+  --steel-dark:   #16202B;
+  --steel:        #6B7A8D;
+  --steel-bright: #9AAABB;
+
+  /* ---------- CORAL — ACCENT ----------
+     Exception / "notice this difference". Strict rule: at most
+     ONE coral element per scene. Never used for data series. */
+  --coral-dark:   #2D1208;
+  --coral:        #FF5E3A;
+  --coral-bright: #FF8C6E;
+
+  /* ---------- DATA SERIES (priority order) ----------
+     Assigned in order as series are added. NEVER use coral for data.
+     0 Amber · 1 Steel · 2 Sage · 3 Mauve · 4 Terra */
+  --data-0: #C49A3C;   /* Amber */
+  --data-1: #6B7A8D;   /* Steel */
+  --data-2: #7D9A6A;   /* Sage  */
+  --data-3: #9A7AB0;   /* Mauve */
+  --data-4: #C47A5A;   /* Terra */
+
+  /* Low-alpha accent fills, for region highlights on surfaces */
+  --amber-wash: rgba(196, 154, 60, 0.14);
+  --coral-wash: rgba(255, 94, 58, 0.13);
+  --steel-wash: rgba(107, 122, 141, 0.14);
+
+  /* ---------- TYPE FAMILIES ---------- */
+  --font-display: 'Rajdhani', 'Inter', system-ui, sans-serif;       /* title cards */
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;    /* author voice */
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace; /* the machine */
+
+  /* ---------- TYPE SCALE ----------
+     Functional hierarchy: title > section > label > annotation > footnote.
+     Sized for figures/docs; the broadcast layer scales these up on a
+     1920×1080 canvas (HUD chapter ≈ 24px, title card ≈ 96px). */
+  --text-display: 56px;   /* title-card / hero display (Rajdhani) */
+  --text-section: 32px;   /* section heading */
+  --text-title:   22px;   /* card / block title */
+  --text-label:   15px;   /* element / HUD label */
+  --text-body:    16px;   /* annotation / explanation body */
+  --text-small:   14px;   /* subtitle / dense annotation */
+  --text-foot:    12.5px; /* footnote / axis tick */
+  --text-micro:   11px;   /* fine print */
+
+  --lh-tight: 1.08; /* @kind other */
+  --lh-snug:  1.32;  /* @kind other */
+  --lh-body:  1.6;   /* @kind other */
+
+  /* Mono / display tracking. Chapter labels are widely tracked. */
+  --track-mono:    0.01em;
+  --track-label:   0.18em;   /* uppercase mono HUD labels (char-spacing 12 in TMP) */
+  --track-display: 0.005em;
+  --weight-display: 600;     /* Rajdhani SemiBold for titles */
+
+  /* ---------- LINE WEIGHTS (diagrams & borders) ----------
+     Consistent across every figure. No decorative variation.
+     LineStrip meshes in CKDataGraph render at 1px. */
+  --line-structure: 1px;   /* connectors, borders, scaffolding, graph border */
+  --line-emphasis:  2px;   /* active path / focal element */
+
+  /* ---------- RADII ----------
+     Restrained — this is an instrument panel, not a consumer app.
+     The broadcast layer itself is effectively square-cornered. */
+  --radius-sm: 2px;
+  --radius:    4px;
+  --radius-lg: 6px;
+
+  /* ---------- SPACING (4px base grid) ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---------- ELEVATION ----------
+     Depth reads from surface lightness first, shadow second.
+     Shadows are deep + soft: objects in a dark void, not paper. */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.45);
+  --shadow-2: 0 6px 22px rgba(0,0,0,0.5);
+  --shadow-3: 0 16px 48px rgba(0,0,0,0.6);
+
+  /* ---------- MOTION ----------
+     Reveals follow content logic, not cinematic preference.
+     Calm, mechanical, linear-ish. No bounce, no overshoot.
+     Mirrors the package's Mathf.Lerp fades (≈ linear). */
+  --ease:     cubic-bezier(0.33, 0.0, 0.2, 1.0); /* @kind other */
+  --ease-lin: linear;                               /* @kind other */
+  --dur-fast: 200ms;                                /* @kind other */
+  --dur:      350ms; /* @kind other */   /* HUD fade ≈ 0.3s */
+  --dur-slow: 1200ms; /* @kind other */  /* transition fades ≈ 1–1.5s */
+
+  /* ---------- RENDER LOOK (the "vibe" of the framed footage) ----------
+     ACES tonemap, contrast +8, saturation −5, bloom 0.3 @ 0.9 threshold,
+     vignette 0.25 / smoothness 0.5, film grain 0.04 @ 0.8 response.
+     Reusable as CSS for HTML mocks of the on-air frame. */
+  --vignette: radial-gradient(120% 120% at 50% 45%,
+                rgba(0,0,0,0) 55%, rgba(0,0,0,0.28) 100%); /* @kind other */
+  --grain-opacity: 0.04; /* @kind other */
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   ============================================================ */
+
+/* Title-card / hero display — Rajdhani. The stage's nameplate. */
+.ck-display {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+  font-size: var(--text-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-display);
+  color: var(--text-bright);
+}
+
+.ck-section {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-section);
+  line-height: var(--lh-snug);
+  color: var(--text-bright);
+}
+
+.ck-title {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--text-title);
+  line-height: var(--lh-snug);
+  color: var(--text-bright);
+}
+
+/* HUD / element label — the name of a thing observed. Mono, uppercase,
+   widely tracked, muted. Matches CKHUD ChapterLabel styling. */
+.ck-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: var(--text-foot);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Annotation / explanation — the author's voice. Inter. */
+.ck-annotation {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+/* Data / measurement / HUD field value — the machine. Mono, amber. */
+.ck-data {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: var(--text-small);
+  letter-spacing: var(--track-mono);
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inline code */
+.ck-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--text-bright);
+  background: var(--void);
+  border: var(--line-structure) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.4em;
+}
+
+/* Subtitle — bottom-center, secondary, no background by default.
+   Matches CKSubtitleDisplay defaults (size 15, TextSecondary). */
+.ck-subtitle {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-small);
+  line-height: var(--lh-snug);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.ck-footnote {
+  font-family: var(--font-body);
+  font-size: var(--text-foot);
+  line-height: var(--lh-snug);
+  color: var(--text-muted);
+}

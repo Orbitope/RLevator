@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's Taking So Long? — an RL elevator-dispatch case study</title>
+<meta name="description" content="Elevator dispatch is a solved problem — until you're the one waiting. A reinforcement-learning case study: a hand-built simulator, PPO, and honest head-to-head measurement against the seventy-year-old LOOK heuristic. RL ties it in a small building and beats it in bigger ones — but the decisive change wasn't the network.">
+<meta property="og:title" content="What's Taking So Long?">
+<meta property="og:description" content="Elevator dispatch is solved — unless you're waiting for one. An interactive RL case study: what the agent sees, how it's scored, how its brain is wired, and the one change that actually beat the classic elevator heuristic.">
+<meta property="og:image" content="og.png">
+<meta property="og:type" content="article">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--void); }
+    a { color: var(--amber); text-decoration: none; border-bottom: 1px solid var(--border); }
+    a:hover { color: var(--amber-bright); border-bottom-color: var(--amber); }
+    body::-webkit-scrollbar { width: 10px; }
+    body::-webkit-scrollbar-track { background: var(--void); }
+    body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+    table.rlv { border-collapse: collapse; font-family: var(--font-mono); font-size: 12.5px; margin: 18px 0 6px; width: 100%; }
+    table.rlv th { text-align: left; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+    table.rlv td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    table.rlv td.hl { color: var(--amber-bright); }
+    table.rlv td.dim { color: var(--text-muted); }
+    .mobile-note { display: none; }
+    @media (max-width: 940px) {
+      .rlv-stage { display: none !important; }
+      .rlv-narrative { width: 100% !important; border-right: none !important; }
+      .rlv-scene { min-height: unset !important; padding: 8vh 0 !important; }
+      .mobile-note { display: block; }
+    }
+  </style>
+</helmet>
+<div data-screen-label="Article" style="background:var(--void);color:var(--text-secondary);font-family:var(--font-body);">
+
+  <!-- ===================== scrolly: narrative + sticky stage ===================== -->
+  <div style="display:flex;width:100%;">
+
+    <!-- narrative column (normal document flow; the page scrolls, not this div) -->
+    <div class="rlv-narrative" style="width:440px;flex:0 0 auto;border-right:1px solid var(--border);background:var(--surface);">
+      <div style="padding:0 34px;">
+
+        <section style="min-height:92vh;display:flex;flex-direction:column;justify-content:center;padding:60px 0 40px;">
+          <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--amber);">Reinforcement learning &#183; case study</div>
+          <h1 style="font-family:var(--font-display);font-weight:700;font-size:44px;line-height:1.04;color:var(--text-bright);margin:14px 0 0;text-wrap:balance;">What&rsquo;s taking so long?</h1>
+          <p style="font-size:16px;line-height:1.6;color:var(--text-secondary);margin:18px 0 0;">Elevator dispatch is a solved problem &mdash; the rules that run most buildings are seventy years old and genuinely good. Solved, anyway, until you&rsquo;re the one in the lobby watching every car idle on the wrong floor, wondering what the holdup could possibly be. That&rsquo;s the wait that made me try to beat the status quo: a learned policy against the incumbent, on identical traffic, measured honestly &mdash; where it earns its keep, and where it doesn&rsquo;t. Scroll to see what the agent sees, how it&rsquo;s scored, how its brain is wired &mdash; and the one change that actually mattered.</p>
+          <p class="mobile-note" style="font-size:13px;line-height:1.5;color:var(--text-muted);margin:16px 0 0;">The interactive visualizations need a wider screen &mdash; on mobile you'll get the prose and the tables.</p>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:26px;letter-spacing:0.1em;">&#8595;&#160;&#160;scroll</div>
+        </section>
+
+        <section class="rlv-scene" data-scene="0" style="min-height:170vh;padding:10vh 0;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">00 &#183; background</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">The incumbents are good</h2>
+          </div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:52vh;">
+            <p style="font-size:15px;line-height:1.6;">Elevator dispatch is not an open problem. Buildings have run on hand-engineered rules for seventy years, and the rules are genuinely good &mdash; collective control (LOOK), cost-function dispatch, destination dispatch. Nobody is waiting for a neural network to rescue their lobby.</p>
+            <p style="font-size:15px;line-height:1.6;">Take LOOK, the most common one. Each car sweeps in one direction, answering every call along the way, and turns around only when nothing is left ahead of it &mdash; like a bus that runs its route to the end and comes back. Unanswered hall calls get handed to whichever idle car is nearest. It needs no tuning, and in a quiet building it is very hard to beat. What it can't do is <em>plan</em>: the assignment is greedy and car-by-car, with no picture of what the other cars &mdash; or the next minute of arrivals &mdash; will do. (The mechanics, and its stronger cost-function cousin, are laid out in full further down.)</p>
+            <p style="font-size:15px;line-height:1.6;">So the honest framing isn't &ldquo;RL beats elevators.&rdquo; It's narrower: a tuned rule set is a fixed strategy, and as buildings get bigger &mdash; more floors, more cars, more coordination between them &mdash; a fixed strategy should start leaving service on the table. That's the bet this project measures. In a small building I fully expect to lose. The interesting question is where the crossover is.</p>
+          </div>
+        </section>
+
+        <section class="rlv-scene" data-scene="1" data-scroll-steps="10" style="min-height:360vh;padding:10vh 0;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">01 &#183; observation</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">What the agent sees</h2>
+          </div>
+          <!-- 10 paragraphs, one per reveal-beat in SceneObservation, evenly spaced so
+               each block lights up as its paragraph reaches the middle of the screen. -->
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:27vh;">
+            <p style="font-size:15px;line-height:1.6;">The agent's entire input is one flat vector of numbers &mdash; 98 of them in the small building, 254 in the mid-size, 648 in the large. But that vector is really a live status panel, and it's easiest to read one block at a time.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Where is each car?</strong> A one-hot row per car marks the floor it's on &mdash; simply its height in the shaft.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Is each car in service?</strong> One bit per car flags the ones switched off &mdash; they grey out and drop from the agent's control.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Which way is it moving, and where between floors?</strong> Travel direction &mdash; down, idle, up &mdash; plus a smooth fractional position.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">How full is it?</strong> Riders over capacity, drawn as the fill gauge &mdash; the difference between a car that can still stop for you and one that can't.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Where do the people aboard want off?</strong> The in-car destination buttons light the floors its riders are headed to.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">Which floors are calling?</strong> Now the demand: a lamp beside a floor, up or down, means someone is waiting there.</p>
+            <p style="font-size:15px;line-height:1.6;"><strong style="color:var(--text-primary);">And how long have they waited?</strong> The call lamps warm from steel to coral as the oldest person there closes on the 45-second abandon limit.</p>
+            <p style="font-size:15px;line-height:1.6;">Together, these seven blocks <em>are</em> the observation &mdash; everything the agent knows, and nothing else, flattened into that one vector.</p>
+            <p style="font-size:15px;line-height:1.6;">And here's the blind spot. The agent sees that people are waiting, and for how long &mdash; but never <em>where they want to go</em>. A real hall call carries no destination, so it must infer demand from the calls alone. This limit comes back later in a way I didn't expect.</p>
+          </div>
+        </section>
+
+        <section class="rlv-scene" data-scene="2" style="min-height:250vh;padding:10vh 0;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">02 &#183; reward</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">How we score it</h2>
+          </div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:52vh;">
+            <p style="font-size:15px;line-height:1.6;">Every half-second decision earns one number, summed from seven forces. Delivering a passenger is the big prize: <strong style="color:var(--amber);font-weight:600;">+10</strong>.</p>
+            <p style="font-size:15px;line-height:1.6;">Underneath, two costs drip every second the system is congested &mdash; people riding, and, weighted three times heavier, people still waiting in the hall.</p>
+            <p style="font-size:15px;line-height:1.6;">Let traffic overwhelm the cars and the catastrophic penalties bite: <strong style="color:var(--coral-bright);font-weight:600;">&minus;8</strong> when someone gives up, <strong style="color:var(--coral-bright);font-weight:600;">&minus;5</strong> when a full queue turns an arrival away.</p>
+            <p style="font-size:15px;line-height:1.6;">There's also a small shaping nudge in the original design: <strong style="color:var(--amber);font-weight:600;">&plusmn;0.4</strong> per floor a loaded car moves toward (or away from) a rider's destination. It looks harmless. Keep it in mind &mdash; it turns out to be the most important coefficient in the whole project, just not in the way you'd think.</p>
+          </div>
+        </section>
+
+        <section class="rlv-scene" data-scene="3" style="min-height:280vh;padding:10vh 0;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">03 &#183; architecture</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">How we wire its brain</h2>
+          </div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:46vh;">
+            <p style="font-size:15px;line-height:1.6;">The simplest brain flattens everything into one lump &mdash; a plain MLP over the whole status panel, one action head per car. No structure, and the network widens with every floor and car you add.</p>
+            <p style="font-size:15px;line-height:1.6;">The structured alternatives all encode a prior. A convolution slides one filter up the floors &mdash; the same weights reused at every height, the way tall buildings repeat themselves.</p>
+            <p style="font-size:15px;line-height:1.6;">One shared mini-brain per car reads a common summary, so the weight set no longer grows with the fleet. And letting those per-car brains talk through attention targets the hardest part of dispatch directly: coordination, so two cars don't chase the same call.</p>
+            <p style="font-size:15px;line-height:1.6;">Escalating structure, escalating theory. The expectation is obvious: the structured brains should win as the building grows. That expectation is tested &mdash; not assumed &mdash; in the results below.</p>
+          </div>
+        </section>
+
+        <section class="rlv-scene" data-scene="4" style="min-height:130vh;padding:10vh 0;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">04 &#183; try it</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">Change what &ldquo;good&rdquo; means</h2>
+          </div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:30vh;">
+            <p style="font-size:15px;line-height:1.6;">The reward function is just seven numbers. Drag them in the panel and watch which behaviour wins &mdash; the coefficients <em>are</em> the goal, and small changes reorder the leaderboard.</p>
+            <p style="font-size:15px;line-height:1.6;">Then open the live <a href="sandbox.dc.html">elevator simulator</a> to run a full building yourself &mdash; arrivals, queues, and all six actions per car.</p>
+          </div>
+        </section>
+
+        <section class="rlv-scene" data-scene="5" style="min-height:200vh;padding:10vh 0 16vh;">
+          <div style="position:sticky;top:22px;background:var(--surface);z-index:1;">
+            <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">05 &#183; results</div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.12;color:var(--text-bright);margin:8px 0 0;">Measured, not vibes</h2>
+          </div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:40vh;">
+            <p style="font-size:15px;line-height:1.6;">Every number here is a greedy policy scored on the same protocol as the classical baseline: hour-long episodes, five fixed seeds, identical passenger traffic for every method, wait times measured over delivered passengers. No cherry-picking against a hobbled opponent &mdash; LOOK plays its best game.</p>
+            <p style="font-size:15px;line-height:1.6;">The thesis line held: in the small building RL <em>ties</em> the heuristic &mdash; there was nothing to win. In the mid-size building it cuts mean wait by <strong style="color:var(--amber);font-weight:600;">a quarter</strong> with zero abandonment; in the large one it delivers more people while cutting abandonment nearly five-fold.</p>
+            <p style="font-size:15px;line-height:1.6;">The twist: none of that came from a fancier network. Flip the reward selector between <em>shaped</em> and <em>unshaped</em> and watch the same flat MLP jump. The full story is below the fold.</p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- sticky visualization stage -->
+    <div class="rlv-stage" style="flex:1;min-width:0;position:relative;background:var(--void);">
+      <div style="position:sticky;top:0;height:100vh;">
+        <!-- Scenes mount progressively (when the reader nears them, then stay
+             mounted): six simultaneous imports race the streaming runtime. -->
+        <div style="{{ layer0 }}"><dc-import name="SceneBackground" hint-size="100%,100%"></dc-import></div>
+        <div style="{{ layer1 }}"><sc-if value="{{ show1 }}" hint-placeholder-val="{{ false }}"><dc-import name="SceneObservation" progress="{{ prog1 }}" capture-mode="{{ true }}" hint-size="100%,100%"></dc-import></sc-if></div>
+        <div style="{{ layer2 }}"><sc-if value="{{ show2 }}" hint-placeholder-val="{{ false }}"><dc-import name="SceneReward" progress="{{ prog2 }}" capture-mode="{{ true }}" hint-size="100%,100%"></dc-import></sc-if></div>
+        <div style="{{ layer3 }}"><sc-if value="{{ show3 }}" hint-placeholder-val="{{ false }}"><dc-import name="SceneArchitectures" progress="{{ prog3 }}" capture-mode="{{ true }}" hint-size="100%,100%"></dc-import></sc-if></div>
+        <div style="{{ layer4 }}"><sc-if value="{{ show4 }}" hint-placeholder-val="{{ false }}"><dc-import name="ScenePlayground" capture-mode="{{ false }}" hint-size="100%,100%"></dc-import></sc-if></div>
+        <div style="{{ layer5 }}"><sc-if value="{{ show5 }}" hint-placeholder-val="{{ false }}"><dc-import name="SceneResults" hint-size="100%,100%"></dc-import></sc-if></div>
+        <div style="{{ dotsStyle }}">
+          <sc-for list="{{ sceneDots }}" as="d" hint-placeholder-count="6"><span style="{{ d.style }}"></span></sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== technical tail ===================== -->
+  <div style="border-top:1px solid var(--border);background:var(--void);">
+    <div style="max-width:880px;margin:0 auto;padding:26px 34px 80px;">
+
+      <section style="padding:56px 0 8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">06 &#183; the setup</div>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">The simulator, rebuilt in tensors</h2>
+        <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">The simulation is turn-based underneath: passengers arrive by a Poisson process whose rate follows a 48-bin daily profile, queue per floor and direction (capacity 12, abandon after 45&#8202;s), and board capacity-8 cars. The policy acts every 0.5&#8202;s of simulated time &mdash; six discrete actions per car (idle, up, down, board-up, board-down, unload) &mdash; while the physics ticks at 0.1&#8202;s underneath: a semi-MDP with reward accumulated between decisions. Three building sizes carry the experiments:</p>
+        <table class="rlv">
+          <tr><th>rung</th><th>floors</th><th>cars</th><th>population</th><th>observation dim</th><th>joint actions</th></tr>
+          <tr><td>S</td><td>8</td><td>3</td><td>360</td><td>98</td><td>6&#179; = 216</td></tr>
+          <tr><td>M</td><td>16</td><td>5</td><td>600</td><td>254</td><td>6&#8309; = 7,776</td></tr>
+          <tr><td>L</td><td>30</td><td>8</td><td>960</td><td>648</td><td>6&#8312; &#8776; 1.7M</td></tr>
+        </table>
+
+        <h3 style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--text-bright);margin:34px 0 0;">The traffic makes the problem</h3>
+        <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">A dispatcher is only as interesting as the demand it faces, so the arrivals aren't a fixed schedule &mdash; they're a stochastic process with structure. Every tick, each floor draws a <strong style="color:var(--text-primary);">Poisson</strong> count of new passengers from a rate that follows a twelve-hour <strong style="color:var(--text-primary);">daily profile</strong> (48 fifteen-minute bins), and each new passenger draws a destination from an origin-dependent distribution. The profile is the sum of three overlapping demand components, and it's their balance over the day that produces the classic traffic patterns:</p>
+        <figure style="margin:20px 0 6px;">
+          <svg viewBox="0 0 840 250" role="img" aria-label="Daily elevator-demand profile: an incoming morning up-peak, a broad midday interfloor plateau, and an outgoing evening down-peak." style="width:100%;height:auto;display:block;">
+            <!-- axes -->
+            <line x1="70" y1="210" x2="810" y2="210" style="stroke:var(--border);stroke-width:1"/>
+            <line x1="70" y1="26" x2="70" y2="210" style="stroke:var(--border);stroke-width:1"/>
+            <text x="60" y="120" transform="rotate(-90 60 120)" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-anchor:middle;">ARRIVAL RATE</text>
+            <!-- x ticks -->
+            <text x="70"  y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">6a</text>
+            <text x="229" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">9a</text>
+            <text x="387" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">12p</text>
+            <text x="546" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">3p</text>
+            <text x="704" y="228" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-anchor:middle;">6p</text>
+            <text x="424" y="246" style="fill:var(--text-muted);font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-anchor:middle;">TIME OF DAY</text>
+            <!-- interfloor filled (the pattern trained on) -->
+            <path d="M70,210 70,196 85,193 101,190 116,186 132,182 147,177 162,173 178,167 193,162 209,156 224,149 240,143 255,136 270,130 286,123 301,117 317,110 332,105 348,99 363,95 378,91 394,88 409,85 425,84 440,83 455,84 471,85 486,88 502,91 517,95 532,99 548,105 563,110 579,117 594,123 610,130 625,136 640,143 656,149 671,156 687,162 702,167 718,173 733,177 748,182 764,186 779,190 795,193 810,196 810,210Z" style="fill:var(--amber);opacity:0.12"/>
+            <!-- incoming (up-peak, morning) -->
+            <polyline points="70,192 85,179 101,159 116,134 132,106 147,77 162,52 178,37 193,35 209,45 224,67 240,95 255,124 270,151 286,172 301,188 317,198 332,204 348,207 363,209 378,209 394,210 409,210 425,210 440,210 810,210" style="fill:none;stroke:var(--steel-bright);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- outgoing (down-peak, evening) -->
+            <polyline points="70,210 440,210 455,210 471,210 486,209 502,208 517,207 532,203 548,198 563,190 579,178 594,161 610,141 625,118 640,94 656,72 671,56 687,49 702,50 718,61 733,80 748,102 764,126 779,149 795,168 810,182" style="fill:none;stroke:var(--coral-bright);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- interfloor line on top (thicker, amber) -->
+            <polyline points="70,196 85,193 101,190 116,186 132,182 147,177 162,173 178,167 193,162 209,156 224,149 240,143 255,136 270,130 286,123 301,117 317,110 332,105 348,99 363,95 378,91 394,88 409,85 425,84 440,83 455,84 471,85 486,88 502,91 517,95 532,99 548,105 563,110 579,117 594,123 610,130 625,136 640,143 656,149 671,156 687,162 702,167 718,173 733,177 748,182 764,186 779,190 795,193 810,196" style="fill:none;stroke:var(--amber-bright);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/>
+            <!-- peak labels -->
+            <text x="193" y="26" style="fill:var(--steel-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">up-peak</text>
+            <text x="687" y="40" style="fill:var(--coral-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">down-peak</text>
+            <text x="440" y="72" style="fill:var(--amber-bright);font-family:var(--font-mono);font-size:11.5px;text-anchor:middle;">interfloor</text>
+          </svg>
+          <figcaption style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);">
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--steel-bright);display:inline-block;"></span>incoming &#183; lobby&#8594;upper</span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--amber-bright);display:inline-block;"></span>interfloor &#183; upper&#8596;upper <span style="color:var(--amber);">&#8226; trained on this slice</span></span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:16px;height:2px;background:var(--coral-bright);display:inline-block;"></span>outgoing &#183; upper&#8594;lobby</span>
+          </figcaption>
+        </figure>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">Origins are lobby-weighted &mdash; all incoming traffic starts at floor 0 &mdash; and destinations follow a matrix: from the lobby, roughly uniform across the upper floors; from an upper floor, split between &ldquo;back to the lobby&rdquo; and &ldquo;across to another upper floor.&rdquo; A single <em>intensity</em> knob scales the whole thing to a target load (population &times; a per-slot factor). The tensor experiments run the <strong style="color:var(--text-primary);">interfloor / midday</strong> slice at nominal load &mdash; deliberately the least forgiving regime for the agent's blind spot, since demand is spread across floors rather than funnelled through the lobby, so the cars can't just camp at the bottom. And because the RNG is counter-based, the same seed replays the <em>identical</em> passenger tape for every method, so LOOK and the learned policy are graded on the same people arriving at the same instants.</p>
+
+        <h3 style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--text-bright);margin:38px 0 0;">What's actually running here</h3>
+        <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">This part matters for trusting the numbers, so let me be concrete. The elevator simulator began as a <strong style="color:var(--text-primary);">Unity</strong> project driven by ML-Agents &mdash; a full 3D build that steps one building at a time. For this work I rebuilt the entire simulation from scratch as a pure-Python <strong style="color:var(--text-primary);">tensor environment</strong>: identical rules and traffic, but the whole state lives in plain arrays, so hundreds of buildings step at once with no game engine in the loop. Every result on this page comes from that Python rebuild.</p>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">The payoff is speed. The tensor environment plus the PPO learner runs at ~46,000 agent-steps/s on a laptop CPU &mdash; about <strong style="color:var(--amber);">37&#215;</strong> the original Unity/ML-Agents pipeline, measured end-to-end on the same machine &mdash; so a five-million-step run drops from hours to roughly two minutes. That single change is why an experiment matrix this wide was even possible; the Unity build is now the thing I check against, not the thing I train in.</p>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">And to trust a rewrite you have to prove it matches, so I built the Python version <em>twice</em>: a slow, readable single-instance <span style="font-family:var(--font-mono);font-size:13px;">reference</span> and the fast batched one, both from a single spec, sharing a counter-based RNG so every random draw is a pure function of <span style="font-family:var(--font-mono);font-size:13px;">(seed, episode, step, slot)</span>. A differential-test battery steps the two side by side and compares every value at <strong style="color:var(--text-primary);">zero tolerance</strong> &mdash; the state is all-integer by design, so there is nothing to be approximately right about. When a number moves in the results below, it's the experiment that changed, not a drifting simulator.</p>
+      </section>
+
+      <section style="padding:56px 0 8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">07 &#183; training &amp; evaluation</div>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">Same ruler for everyone</h2>
+        <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">The trainer is PPO with one categorical head per car and action masking &mdash; a car mid-travel can only no-op; boarding is masked when the car is full. Observations are normalized online; entropy is annealed to zero over training and the best checkpoint by episode return is kept. Two details earned their place the hard way: evaluation is <em>greedy</em> (argmax, matching how deterministic dispatchers run), and a slightly under-converged stochastic policy can look competent while its argmax parks a full car on a legal no-op forever. Masking board-when-full and annealing entropy gently removed that failure on every seed. I also tried a value-based D3QN &mdash; natively greedy, perfectly robust, and ~1.7&#215; LOOK's mean wait; PPO stayed.</p>
+        <p style="font-size:15px;line-height:1.65;margin:16px 0 0;">Networks: 256&#215;2 at S, 768&#215;4 at M and L (the structured variants below use 512&#215;3). Budgets: 5M steps at S (parity with the original Unity run), 10&ndash;15M at M/L. Evaluation protocol, identical for every method including LOOK: 3,600&#8202;s episodes with a 300&#8202;s warmup, seeds 1&ndash;5, identical traffic per seed, wait statistics over delivered passengers with p95 from a 64-bin histogram. <strong style="color:var(--text-primary);">Every RL number on this page is stated relative to LOOK on the same traffic tape.</strong></p>
+      </section>
+
+      <section style="padding:56px 0 8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">08 &#183; findings</div>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">The network didn't matter. The objective did.</h2>
+
+        <p style="font-size:15px;line-height:1.65;margin:18px 0 0;">Headline first &mdash; final policy (flat MLP, unshaped reward) versus LOOK, per building size, means over the five seeds:</p>
+        <table class="rlv">
+          <tr><th>rung</th><th>method</th><th>delivered</th><th>wait mean (s)</th><th>wait p95 (s)</th><th>abandoned</th></tr>
+          <tr><td>S</td><td class="dim">LOOK</td><td class="dim">245</td><td class="dim">6.0</td><td class="dim">16.5</td><td class="dim">0.2</td></tr>
+          <tr><td></td><td>PPO</td><td>245</td><td>5.85</td><td>16.2</td><td>0</td></tr>
+          <tr><td>M</td><td class="dim">LOOK</td><td class="dim">418</td><td class="dim">9.1</td><td class="dim">26.1</td><td class="dim">3.4</td></tr>
+          <tr><td></td><td>PPO</td><td class="hl">422</td><td class="hl">6.86</td><td class="hl">18.0</td><td class="hl">0</td></tr>
+          <tr><td>L</td><td class="dim">LOOK</td><td class="dim">678</td><td class="dim">10.4</td><td class="dim">30.3</td><td class="dim">14.6</td></tr>
+          <tr><td></td><td>PPO</td><td class="hl">686</td><td class="hl">9.83</td><td class="hl">28.3</td><td class="hl">3.0</td></tr>
+        </table>
+        <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Exactly the shape the thesis predicted: a tie where the heuristic is already near-optimal, a clear win once there's coordination to exploit &mdash; <strong style="color:var(--amber);">&minus;25% mean wait and zero abandonment at M</strong>, more delivered with a fraction of the abandonment at L.</p>
+
+        <div style="margin:26px 0 0;padding:16px 18px;border-left:2px solid var(--amber);background:var(--surface);border-radius:0 4px 4px 0;">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;">shaped vs. unshaped reward</div>
+          <p style="font-size:14.5px;line-height:1.6;margin:0;color:var(--text-secondary);">The reward has seven terms (scene&#160;02). <strong style="color:var(--text-primary);">Shaped</strong> is the original design: it includes a small <strong style="color:var(--amber);">&plusmn;0.4</strong>-per-floor bonus/penalty for a loaded car moving <em>toward</em> (or away from) a rider's destination &mdash; a hint that pays the agent for <em>looking like progress</em>, before anyone is actually delivered. <strong style="color:var(--text-primary);">Unshaped</strong> deletes those two movement terms, so the agent is paid only for real outcomes: deliveries, time spent waiting and riding, and the abandon / reject penalties. Every other coefficient is identical. That one difference is the whole experiment below.</p>
+        </div>
+        <p style="font-size:15px;line-height:1.65;margin:26px 0 0;">Now the part I got wrong. I built four architectures expecting structure to win at scale. Measured at M under the original (shaped) reward:</p>
+        <table class="rlv">
+          <tr><th>architecture</th><th>training return</th><th>wait mean (s)</th><th>wait p95 (s)</th><th>abandoned</th></tr>
+          <tr><td>Flat MLP</td><td>1,258</td><td class="hl">7.5</td><td class="hl">21.1</td><td class="hl">0.8</td></tr>
+          <tr><td>Attention</td><td>1,449</td><td>8.0</td><td>23.9</td><td>3.4</td></tr>
+          <tr><td>Per-car</td><td>1,366</td><td>8.9</td><td>27.0</td><td>5.0</td></tr>
+          <tr><td>Conv</td><td>1,326</td><td>8.9</td><td>31.6</td><td>26.0</td></tr>
+        </table>
+        <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Read those two columns against each other. <strong style="color:var(--text-primary);">Every structured network out-optimized the flat one on the training objective, and not one of them out-served it.</strong> They weren't failing to learn &mdash; they were learning the wrong thing better. That pattern &mdash; higher reward, worse service &mdash; points at exactly one suspect: the reward.</p>
+
+        <p style="font-size:15px;line-height:1.65;margin:26px 0 0;">The suspect was the &plusmn;0.4 movement nudge from scene 02. It pays a loaded car for drifting toward destinations whether or not anyone gets delivered &mdash; a subsidy the more expressive networks learned to farm. Deleting those two coefficients and retraining the plain flat MLP:</p>
+        <table class="rlv">
+          <tr><th>rung</th><th>reward</th><th>wait mean (s)</th><th>wait p95 (s)</th><th>abandoned</th></tr>
+          <tr><td>M</td><td class="dim">shaped</td><td class="dim">7.5</td><td class="dim">21.1</td><td class="dim">0.8</td></tr>
+          <tr><td></td><td>unshaped</td><td class="hl">6.86</td><td class="hl">18.0</td><td class="hl">0</td></tr>
+          <tr><td>L</td><td class="dim">shaped</td><td class="dim">9.45</td><td class="dim">28.4</td><td class="dim">19.8</td></tr>
+          <tr><td></td><td>unshaped</td><td class="hl">9.83</td><td class="hl">28.3</td><td class="hl">3.0</td></tr>
+        </table>
+        <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Strictly better where it counts &mdash; at L the abandonment drops from 20 to 3 <em>for the same architecture</em>. The single highest-leverage change in this project was deleting two numbers from the reward function. Months of architecture work resolved to an objective-alignment bug, which is either deflating or the most useful lesson here, depending on how you look at it. My take: <strong style="color:var(--text-primary);">measure the objective before you upgrade the model.</strong></p>
+      </section>
+
+      <section style="padding:56px 0 8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">09 &#183; limitations</div>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">What these numbers don't claim</h2>
+        <ul style="font-size:15px;line-height:1.7;margin:18px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:10px;">
+          <li>The Python environment is a <em>semantic</em> port of the original Unity simulator &mdash; statistically matched (the LOOK baseline reproduces the Unity harness within noise), not bit-identical. Same distributions, different random streams.</li>
+          <li>The observation is destination-blind by design &mdash; the agent sees that people are waiting and for how long, never where they want to go, exactly like a real hall call. That's realistic, but it also caps the ceiling: no policy can pre-position for demand it can't see, so some of the gap that stays open at scale is baked into the inputs, not the network.</li>
+          <li>Tensor-pipeline results cover the interfloor (midday) traffic pattern at nominal intensity. Other patterns and stress loads were only baselined in the earlier Unity phase.</li>
+          <li>Budgets are laptop-CPU sized: five seeds per cell, one building geometry per rung, no hyperparameter sweeps. The deltas are consistent across every seed, but these are workstation experiments, not a benchmark suite.</li>
+          <li>Reward totals are only comparable within a reward preset &mdash; shaped and unshaped policies optimize different objectives. Service metrics (wait, delivered, abandoned) are directly comparable everywhere.</li>
+        </ul>
+      </section>
+
+      <section style="padding:56px 0 8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">10 &#183; what's next &amp; resources</div>
+        <h2 style="font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;color:var(--text-bright);margin:10px 0 0;">Where this goes</h2>
+        <ul style="font-size:15px;line-height:1.7;margin:18px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:8px;">
+          <li>Give the agent destination information (the destination-dispatch premise) and measure how much of the remaining gap the blind spot was actually costing.</li>
+          <li>Day-cycle and stress-intensity traffic through the fast pipeline, where each run is minutes instead of hours.</li>
+          <li>Further objective alignment &mdash; the shaping deletion suggests the remaining coefficients deserve the same scrutiny.</li>
+        </ul>
+        <div style="margin-top:34px;padding-top:18px;border-top:1px solid var(--border);">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">resources</div>
+          <ul style="font-size:14px;line-height:1.8;margin:12px 0 0;padding-left:22px;">
+            <li><a href="https://github.com/Orbitope/RLevator">Orbitope/RLevator</a> &mdash; the repo: Unity simulator, tensor environment, trainers, eval harness, and this site.</li>
+            <li><a href="sandbox.dc.html">Live sandbox</a> &mdash; run the building yourself.</li>
+            <li><a href="https://proceedings.neurips.cc/paper/1995/hash/390e982518a50e280d8e2b535462ec1f-Abstract.html">Crites &amp; Barto, <em>Improving Elevator Performance Using Reinforcement Learning</em> (NeurIPS 1995)</a> &mdash; the original RL-for-elevators work: Q-learning, 4 cars, 10 floors.</li>
+            <li><a href="http://incompleteideas.net/book/first/ebook/node111.html">Sutton &amp; Barto, <em>Reinforcement Learning</em>, &sect;11.4 Elevator Dispatching</a> &mdash; the textbook treatment of the same case study.</li>
+            <li><a href="https://en.wikipedia.org/wiki/Destination_dispatch">Destination dispatch</a> &mdash; background on the Miconic&#160;10 lineage.</li>
+            <li><a href="https://www.otis.com/en/us/our-company/history">Otis company history</a> &mdash; the Elevonic microprocessor-dispatch era.</li>
+          </ul>
+        </div>
+        <div style="margin-top:44px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:0.06em;">Orbitope &#183; 2026 &#183; simulator, visualizations, and experiments from the RLevator project</div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:840}}">
+class Component extends DCLogic {
+  N = 6;
+  state = { active: 0, prog: [0, 0, 0, 0, 0, 0] };
+
+  componentDidMount() {
+    this.onScroll = this.onScroll.bind(this);
+    // Listen wide: some embedded viewers surface scrolling on document, not
+    // window. A light poller (4Hz-ish via rAF batching) is the final net —
+    // compute() no-op-skips, so quiet frames cost one comparison.
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    document.addEventListener('scroll', this.onScroll, { passive: true, capture: true });
+    window.addEventListener('resize', this.onScroll, { passive: true });
+    this._poll = setInterval(() => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      // call compute() directly: rAF can starve in backgrounded/embedded
+      // viewers, and the 250ms interval is already the throttle.
+      if (y !== this._lastY) { this._lastY = y; this.compute(); }
+    }, 250);
+    requestAnimationFrame(() => this.compute());
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this.onScroll);
+    document.removeEventListener('scroll', this.onScroll, { capture: true });
+    window.removeEventListener('resize', this.onScroll);
+    clearInterval(this._poll);
+  }
+
+  onScroll() { if (this._raf) return; this._raf = requestAnimationFrame(() => { this._raf = null; this.compute(); }); }
+
+  compute() {
+    // innerHeight is 0 in some embedded viewers; clientHeight is reliable.
+    const vh = document.documentElement.clientHeight || window.innerHeight || 800;
+    const blocks = [...document.querySelectorAll('[data-scene]')];
+    if (!blocks.length) return;
+    const prog = new Array(this.N).fill(0);
+    let active = 0;
+    const readLine = vh * 0.45;
+    blocks.forEach((b) => {
+      const i = +b.getAttribute('data-scene');
+      const r = b.getBoundingClientRect();
+      if (b.hasAttribute('data-scroll-steps')) {
+        // Discrete step model: each narrative paragraph owns a scroll band, and
+        // the scene's beat = the paragraph nearest the read-line. This keeps the
+        // viz highlight locked to the paragraph you're actually reading (no
+        // continuous drift when paragraph heights differ), and hands off cleanly
+        // at the midpoint of each gap instead of flickering between beats.
+        const ps = [...b.querySelectorAll('p')];
+        if (ps.length > 1) {
+          let best = 0, bestd = Infinity;
+          ps.forEach((el, idx) => {
+            const rr = el.getBoundingClientRect();
+            const c = rr.top + rr.height / 2;
+            const d = Math.abs(c - readLine);
+            if (d < bestd) { bestd = d; best = idx; }
+          });
+          prog[i] = best / (ps.length - 1);
+        }
+      } else {
+        const denom = Math.max(1, r.height - vh);
+        // window-scroll equivalent of the original inner-scroller math,
+        // quantized to 1/24 steps so scrolling doesn't re-render the whole
+        // scene tree at 60fps (six imported scenes are too heavy for that).
+        const raw = Math.max(0, Math.min(1, (vh * 0.15 - r.top) / denom));
+        prog[i] = Math.round(raw * 24) / 24;
+      }
+      if (r.top <= vh * 0.5 && r.top + r.height > vh * 0.5) active = i;
+    });
+    // past the last scene (tail in view): hold the last scene's end-state
+    const last = blocks[blocks.length - 1].getBoundingClientRect();
+    if (last.top + last.height <= vh * 0.5) active = this.N - 1;
+    for (let i = 0; i < active; i++) prog[i] = 1;
+    // skip no-op renders entirely
+    const s = this.state;
+    if (active === s.active && prog.every((p, i) => p === s.prog[i])) return;
+    this.setState({ active, prog });
+  }
+
+  renderVals() {
+    const { active, prog } = this.state;
+    // progressive mounting: a scene mounts when the reader is within one
+    // scene of it, and stays mounted afterwards (preserves playground state).
+    if (!this._shown) this._shown = { 1: true };
+    for (let i = 1; i < this.N; i++) if (Math.abs(active - i) <= 1) this._shown[i] = true;
+    const layer = (i) => ({
+      position: 'absolute', inset: '0', opacity: active === i ? 1 : 0,
+      pointerEvents: active === i ? 'auto' : 'none',
+      transition: 'opacity 450ms ease', zIndex: active === i ? 2 : 1,
+    });
+    const sceneDots = Array.from({ length: this.N }, (_, i) => ({
+      key: i, style: { width: '7px', height: '7px', borderRadius: '50%', background: active === i ? 'var(--amber)' : 'var(--border)', transition: 'background 250ms' },
+    }));
+    return {
+      prog1: prog[1], prog2: prog[2], prog3: prog[3],
+      layer0: layer(0), layer1: layer(1), layer2: layer(2),
+      layer3: layer(3), layer4: layer(4), layer5: layer(5),
+      show1: !!this._shown[1], show2: !!this._shown[2], show3: !!this._shown[3],
+      show4: !!this._shown[4], show5: !!this._shown[5],
+      sceneDots,
+      dotsStyle: { position: 'absolute', right: '18px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 3 },
+    };
+  }
+}
+</script>
+</body>
+</html>

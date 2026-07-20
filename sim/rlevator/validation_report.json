@@ -1,0 +1,79 @@
+{
+  "env": "rlevator",
+  "overall_pass": true,
+  "created_at": "2026-07-20T01:10:40.608955+00:00",
+  "git_sha": "6bed249192463c620432cf22f2d2b1b512784a49",
+  "versions": {
+    "python": "3.13.0",
+    "platform": "macOS-14.3-arm64-arm-64bit-Mach-O",
+    "simulacrum": "0.1.0",
+    "torch": "2.13.0",
+    "numpy": "2.5.1"
+  },
+  "tests": {
+    "test_spec_contract": {
+      "outcome": "passed",
+      "duration": 0.01,
+      "message": null
+    },
+    "test_differential": {
+      "outcome": "passed",
+      "duration": 43.197,
+      "message": null
+    },
+    "test_batch_independence": {
+      "outcome": "passed",
+      "duration": 42.98,
+      "message": null
+    },
+    "test_invariant_sweep": {
+      "outcome": "passed",
+      "duration": 34.944,
+      "message": null
+    },
+    "test_auto_reset": {
+      "outcome": "passed",
+      "duration": 210.989,
+      "message": null
+    },
+    "test_determinism": {
+      "outcome": "passed",
+      "duration": 11.129,
+      "message": null
+    },
+    "test_replay": {
+      "outcome": "passed",
+      "duration": 2.626,
+      "message": null
+    },
+    "test_scripted_policies": {
+      "outcome": "passed",
+      "duration": 13.455,
+      "message": null
+    },
+    "test_benchmark_factory_parity": {
+      "outcome": "passed",
+      "duration": 112.672,
+      "message": null
+    },
+    "test_throughput": {
+      "outcome": "passed",
+      "duration": 454.454,
+      "message": null
+    }
+  },
+  "required_tests_not_passed": [],
+  "tolerance_fields_used": {},
+  "throughput": {
+    "reference_steps_per_sec": 3199.408449827947,
+    "batched": {
+      "n=1,debug=False": 1063.8693996695729,
+      "n=1,debug=True": 66.08489442131636,
+      "n=64,debug=False": 5318.830900910234,
+      "n=64,debug=True": 2151.7224815559525,
+      "n=1024,debug=False": 15019.43588706374,
+      "n=1024,debug=True": 3082.906071804806
+    },
+    "speedup_at_largest_batch": 4.694441526486383
+  }
+}

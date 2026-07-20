@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="assets/contentkit.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--void); }
+    @keyframes flowDash { to { stroke-dashoffset: -16; } }
+    @keyframes ckGlow { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+<div data-screen-label="Architectures" style="display:flex;flex-direction:column;width:100%;height:100vh;min-height:620px;background:var(--void);color:var(--text-secondary);font-family:var(--font-body);overflow:hidden;">
+
+  <header style="display:flex;align-items:flex-start;justify-content:space-between;flex:0 0 auto;padding:16px 26px 14px;border-bottom:1px solid var(--border);">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">Architectures &#183; how the brain is wired</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--text-bright);margin-top:2px;">{{ archTitle }}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:20px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">structural prior</span>
+        <div style="display:flex;gap:5px;margin-top:5px;">
+          <sc-for list="{{ priorDots }}" as="d" hint-placeholder-count="4"><span style="{{ d.style }}"></span></sc-for>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex:1;min-height:0;">
+    <!-- wiring diagram -->
+    <section style="flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 20px 8px;">
+      <div style="flex:1;min-height:0;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px;">
+        <svg viewBox="0 0 720 470" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;">
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="10"><path d="{{ e.d }}" fill="none" stroke="{{ e.stroke }}" stroke-width="{{ e.w }}" style="{{ e.style }}"></path></sc-for>
+          <sc-for list="{{ rects }}" as="r" hint-placeholder-count="8"><rect x="{{ r.x }}" y="{{ r.y }}" width="{{ r.w }}" height="{{ r.h }}" rx="{{ r.rx }}" fill="{{ r.fill }}" stroke="{{ r.stroke }}" stroke-width="{{ r.sw }}" style="{{ r.style }}"></rect></sc-for>
+          <sc-for list="{{ movers }}" as="m" hint-placeholder-count="0"><rect x="{{ m.x }}" y="{{ m.y }}" width="{{ m.w }}" height="{{ m.h }}" rx="2" fill="{{ m.fill }}" stroke="{{ m.stroke }}" stroke-width="1.5"><animateTransform attributeName="transform" type="translate" values="{{ m.values }}" dur="3.4s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.2 1;0.4 0 0.2 1"></animateTransform></rect></sc-for>
+          <sc-for list="{{ pulses }}" as="pl" hint-placeholder-count="0"><circle r="{{ pl.r }}" fill="{{ pl.fill }}"><animateMotion path="{{ pl.path }}" dur="{{ pl.dur }}" begin="{{ pl.begin }}" repeatCount="indefinite" calcMode="linear"></animateMotion></circle></sc-for>
+          <sc-for list="{{ texts }}" as="t" hint-placeholder-count="6"><text x="{{ t.x }}" y="{{ t.y }}" fill="{{ t.fill }}" font-family="var(--font-mono)" font-size="{{ t.size }}" text-anchor="{{ t.anchor }}" style="{{ t.style }}">{{ t.s }}</text></sc-for>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-body);font-size:13px;line-height:1.45;color:var(--text-secondary);margin-top:9px;min-height:38px;max-width:76ch;">{{ caption }}</div>
+    </section>
+
+    <!-- scaling panel -->
+    <aside style="width:314px;flex:0 0 auto;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow-y:auto;">
+      <div style="padding:16px 20px 4px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);">parameters as the building grows</span>
+        <div style="font-family:var(--font-body);font-size:11px;color:var(--text-muted);margin-top:3px;">illustrative &#183; S 8&#215;3 &#183; M 16&#215;5 &#183; L 30&#215;8</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;padding:14px 20px 16px;">
+        <sc-for list="{{ scaleRows }}" as="r" hint-placeholder-count="4">
+          <div style="{{ r.wrapStyle }}">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+              <span style="font-family:var(--font-mono);font-size:12px;color:{{ r.nameColor }};">{{ r.name }}</span>
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">params</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:7px;">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);width:12px;">{{ b.size }}</span>
+                  <div style="flex:1;height:9px;background:var(--void);border-radius:2px;overflow:hidden;"><div style="{{ b.fillStyle }}"></div></div>
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);width:40px;text-align:right;">{{ b.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">scaling verdict</span>
+        <div style="font-family:var(--font-body);font-size:13px;line-height:1.5;color:{{ verdictColor }};margin-top:6px;">{{ verdict }}</div>
+      </div>
+    </aside>
+  </main>
+
+  <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+    <footer style="display:flex;align-items:center;gap:12px;flex:0 0 auto;padding:11px 22px;border-top:1px solid var(--border);background:var(--surface);">
+      <button onClick="{{ togglePlay }}" style="{{ playStyle }}">{{ playLabel }}</button>
+      <div style="display:flex;gap:8px;flex:1;">
+        <sc-for list="{{ archTabs }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.idx }}&#160;&#160;{{ t.label }}</button></sc-for>
+      </div>
+      <button onClick="{{ toggleShare }}" style="{{ shareStyle }}">SHARED WEIGHTS&#160;&#160;{{ shareLabel }}</button>
+    </footer>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:800},&quot;progress&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Scrollytelling&quot;},&quot;captureMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Recording&quot;}}">
+class Component extends DCLogic {
+  E = 5; // cars shown in the diagrams (representative of size M)
+  ARCHS = [
+    { key: 'flat', label: 'Flat MLP', prior: 1,
+      title: 'Flat MLP \u2014 one lump, a flat list',
+      caption: 'Flatten the whole status panel into one long vector, push it through a couple of dense layers, then split into a decision per car. No notion that floors form a line or that cars are alike \u2014 every input wired to everything.',
+      verdict: 'No structure at all &mdash; the net just widens with every car and floor. The natural expectation is that this stops scaling. Whether it actually does is measured below.', verdictBad: true },
+    { key: 'conv', label: 'Conv', prior: 2,
+      title: 'Convolution \u2014 floors are a spatial line',
+      caption: 'Arrange the floor-indexed data as a [channels \u00d7 floors] image and slide one small filter up the building \u2014 the same weights at every floor. The network stops relearning "what a floor looks like" 30 times.',
+      verdict: 'Shares one filter across all floors, so it barely grows as the building gets taller \u2014 the classic prior for tall buildings.', verdictBad: false },
+    { key: 'percar', label: 'Per-car', prior: 3,
+      title: 'Per-car shared \u2014 cars are interchangeable',
+      caption: 'One identical mini-brain is applied to each car: it reads that car\u2019s own state plus a shared summary of the building, then decides. The same weights are reused for every elevator.',
+      verdict: 'Fleet-size-independent: the same mini-brain serves any number of cars, so it barely grows from M to L.', verdictBad: false },
+    { key: 'attn', label: 'Attention', prior: 4,
+      title: 'Attention \u2014 the cars coordinate',
+      caption: 'The per-car brains talk to each other through self-attention before committing, so each car\u2019s decision is conditioned on what the others are about to do. Structure aimed straight at coordination.',
+      verdict: 'Per-car sharing plus a small attention block: still near fleet-independent, and it targets anti-bunching directly.', verdictBad: false },
+  ];
+  // illustrative parameter counts (thousands) at S / M / L
+  PARAMS = { flat: [31, 96, 420], conv: [22, 28, 41], percar: [34, 36, 39], attn: [48, 55, 71] };
+  PMAX = 420;
+
+  state = { arch: 0, playing: true, share: true };
+  toggleShare = () => this.setState((s) => ({ share: !s.share }));
+
+  componentDidMount() {
+    if (this.props.progress == null && this.state.playing) this.startAuto();
+    if (typeof window !== 'undefined') window.archViz = { goTo: (n) => this.goTo(n), play: () => this.play(), pause: () => this.pause() };
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  startAuto() { clearInterval(this.timer); this.timer = setInterval(() => {
+    this.setState((s) => ({ arch: Math.min(this.ARCHS.length - 1, s.arch + 1) }), () => { if (this.state.arch >= this.ARCHS.length - 1) this.pause(); });
+  }, 4200); }
+  play = () => this.setState({ playing: true }, () => this.startAuto());
+  pause = () => { clearInterval(this.timer); this.setState({ playing: false }); };
+  togglePlay = () => { if (this.state.playing) this.pause(); else { if (this.state.arch >= this.ARCHS.length - 1) this.setState({ arch: 0 }); this.play(); } };
+  goTo = (n) => { this.pause(); this.setState({ arch: Math.max(0, Math.min(this.ARCHS.length - 1, n)) }); };
+
+  flowStyle(on) { return on ? 'stroke-dasharray:5 9; animation: flowDash 0.85s linear infinite;' : ''; }
+
+  obsCells() {
+    const rects = [], edges = [];
+    const x = 20, w = 64, h = 22;
+    for (let i = 0; i < 6; i++) rects.push({ key: 'o' + i, x, y: 66 + i * 34, w, h, rx: 2, fill: 'var(--raised)', stroke: 'var(--border)' });
+    return { rects, edges, cx: x + w, ys: Array.from({ length: 6 }, (_, i) => 66 + i * 34 + h / 2) };
+  }
+
+  diagram(key) {
+    const share = this.state.share;
+    const obs = this.obsCells();
+    const rects = [...obs.rects], edges = [], texts = [], movers = [], pulses = [];
+    texts.push({ key: 'obsT', x: 20, y: 54, fill: 'var(--text-muted)', size: 11, anchor: 'start', s: 'observation' });
+    const amber = 'var(--amber)', steel = 'var(--steel)', wash = 'var(--amber-wash)';
+    const headX = 636, headYs = Array.from({ length: this.E }, (_, i) => 96 + i * 56);
+    const addHeads = (fromX, fromYs) => {
+      headYs.forEach((hy, i) => {
+        rects.push({ key: 'h' + i, x: headX, y: hy, w: 58, h: 34, rx: 3, fill: 'var(--raised)', stroke: amber });
+        texts.push({ key: 'ht' + i, x: headX + 29, y: hy + 22, fill: 'var(--amber-bright)', size: 11, anchor: 'middle', s: 'E' + i + '\u00d76' });
+        const fy = fromYs.length === 1 ? fromYs[0] : fromYs[Math.min(i, fromYs.length - 1)];
+        const fx = fromX;
+        const hd = 'M ' + fx + ' ' + fy + ' C ' + (fx + 40) + ' ' + fy + ' ' + (headX - 40) + ' ' + (hy + 17) + ' ' + headX + ' ' + (hy + 17);
+        edges.push({ key: 'he' + i, d: hd, stroke: amber, w: 1.4, style: this.flowStyle(true) });
+        pulses.push({ key: 'hp' + i, path: hd, dur: '1.5s', begin: (i * 0.12).toFixed(2) + 's', r: 2.6, fill: 'var(--amber-bright)' });
+      });
+      texts.push({ key: 'headT', x: headX + 29, y: 78, fill: 'var(--text-muted)', size: 11, anchor: 'middle', s: 'per-car action' });
+    };
+
+    if (key === 'flat') {
+      const flat = { x: 150, y: 66, w: 24, h: 244 };
+      rects.push({ key: 'flat', ...flat, rx: 2, fill: wash, stroke: amber });
+      texts.push({ key: 'flatT', x: flat.x + 12, y: 330, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'flatten' });
+      obs.ys.forEach((y, i) => edges.push({ key: 'oe' + i, d: 'M 84 ' + y + ' L ' + flat.x + ' ' + (100 + i * 30), stroke: steel, w: 1, style: this.flowStyle(true) }));
+      const d1 = { x: 240, y: 96, w: 90, h: 190 }, d2 = { x: 380, y: 96, w: 90, h: 190 };
+      rects.push({ key: 'd1', ...d1, rx: 3, fill: 'var(--raised)', stroke: 'var(--border)' });
+      rects.push({ key: 'd2', ...d2, rx: 3, fill: 'var(--raised)', stroke: 'var(--border)' });
+      texts.push({ key: 'd1t', x: d1.x + 45, y: 300, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'dense' });
+      texts.push({ key: 'd2t', x: d2.x + 45, y: 300, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'dense' });
+      // dense mesh edges
+      for (let i = 0; i < 5; i++) edges.push({ key: 'm1' + i, d: 'M ' + (flat.x + flat.w) + ' ' + (100 + i * 44) + ' L ' + d1.x + ' ' + (110 + i * 40), stroke: steel, w: 1, style: this.flowStyle(true) });
+      for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) edges.push({ key: 'm2' + i + j, d: 'M ' + (d1.x + d1.w) + ' ' + (120 + i * 36) + ' L ' + d2.x + ' ' + (130 + j * 60), stroke: 'var(--border)', w: 0.8, style: '' });
+      pulses.push({ key: 'fp', path: 'M 84 ' + obs.ys[2] + ' L ' + flat.x + ' 155', dur: '1.3s', begin: '0s', r: 3, fill: amber });
+      pulses.push({ key: 'fp2', path: 'M ' + (flat.x + flat.w) + ' 190 L ' + d1.x + ' 190 L ' + (d1.x + d1.w) + ' 190 L ' + d2.x + ' 190', dur: '1.4s', begin: '0.2s', r: 3, fill: amber });
+      addHeads(d2.x + d2.w, [d2.y + d2.h / 2]);
+      texts.push({ key: 'note', x: 380, y: 340, fill: 'var(--steel-bright)', size: 11, anchor: 'middle', s: 'every input \u2192 everything' });
+    }
+
+    if (key === 'conv') {
+      const grid = { x: 150, y: 70, w: 120, h: 250 };
+      rects.push({ key: 'grid', ...grid, rx: 2, fill: 'var(--void)', stroke: 'var(--border)' });
+      for (let i = 1; i < 8; i++) edges.push({ key: 'gl' + i, d: 'M ' + grid.x + ' ' + (grid.y + i * 31) + ' L ' + (grid.x + grid.w) + ' ' + (grid.y + i * 31), stroke: 'var(--border)', w: 0.8, style: '' });
+      texts.push({ key: 'gt', x: grid.x + grid.w / 2, y: 338, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'channels \u00d7 floors' });
+      obs.ys.forEach((y, i) => edges.push({ key: 'oe' + i, d: 'M 84 ' + y + ' L ' + grid.x + ' ' + (90 + i * 38), stroke: steel, w: 1, style: this.flowStyle(true) }));
+      if (share) for (let i = 0; i < 8; i++) rects.push({ key: 'ghost' + i, x: grid.x - 3, y: grid.y + 2 + i * 31, w: grid.w + 6, h: 28, rx: 2, fill: 'none', stroke: amber, sw: 1, style: 'opacity:0.3;' });
+      movers.push({ key: 'kernel', x: grid.x - 4, y: grid.y + 4, w: grid.w + 8, h: 34, fill: 'var(--amber-wash)', stroke: amber, values: '0,0; 0,210; 0,0' });
+      texts.push({ key: 'kt', x: grid.x + grid.w / 2, y: 58, fill: 'var(--amber-bright)', size: 11, anchor: 'middle', s: 'one filter, every floor' });
+      const feat = { x: 340, y: 110, w: 80, h: 160 }, pool = { x: 470, y: 150, w: 60, h: 80 };
+      rects.push({ key: 'feat', ...feat, rx: 3, fill: 'var(--raised)', stroke: 'var(--border)' });
+      rects.push({ key: 'pool', ...pool, rx: 3, fill: 'var(--raised)', stroke: 'var(--border)' });
+      texts.push({ key: 'ft', x: feat.x + 40, y: 286, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'features' });
+      texts.push({ key: 'pt', x: pool.x + 30, y: 246, fill: 'var(--text-muted)', size: 10, anchor: 'middle', s: 'pool' });
+      edges.push({ key: 'e1', d: 'M ' + (grid.x + grid.w) + ' 195 L ' + feat.x + ' 190', stroke: amber, w: 1.4, style: this.flowStyle(true) });
+      edges.push({ key: 'e2', d: 'M ' + (feat.x + feat.w) + ' 190 L ' + pool.x + ' 190', stroke: amber, w: 1.4, style: this.flowStyle(true) });
+      pulses.push({ key: 'cp', path: 'M ' + (grid.x + grid.w) + ' 190 L ' + feat.x + ' 190 L ' + (feat.x + feat.w) + ' 190 L ' + pool.x + ' 190', dur: '1.5s', begin: '0s', r: 3, fill: amber });
+      addHeads(pool.x + pool.w, [pool.y + pool.h / 2]);
+    }
+
+    if (key === 'percar' || key === 'attn') {
+      const summary = { x: 150, y: 66, w: 360, h: 36 };
+      rects.push({ key: 'sum', ...summary, rx: 3, fill: 'var(--raised)', stroke: steel });
+      texts.push({ key: 'sumt', x: summary.x + summary.w / 2, y: 89, fill: 'var(--text-secondary)', size: 11, anchor: 'middle', s: 'shared building summary' });
+      obs.ys.forEach((y, i) => edges.push({ key: 'oe' + i, d: 'M 84 ' + y + ' L 150 ' + (74 + i * 5), stroke: steel, w: 1, style: this.flowStyle(true) }));
+      const bw = 60, gap = 15, startX = 168, by = 150;
+      const brainX = [];
+      for (let i = 0; i < this.E; i++) {
+        const x = startX + i * (bw + gap); brainX.push(x);
+        rects.push({ key: 'b' + i, x, y: by, w: bw, h: 62, rx: 6, fill: 'var(--amber-wash)', stroke: amber, sw: share ? 2 : 1, style: share ? 'animation: ckGlow 1.8s ease-in-out infinite;' : '' });
+        texts.push({ key: 'bt' + i, x: x + bw / 2, y: by + 37, fill: 'var(--amber-bright)', size: 11, anchor: 'middle', s: 'E' + i });
+        edges.push({ key: 'se' + i, d: 'M ' + (x + bw / 2) + ' ' + (summary.y + summary.h) + ' L ' + (x + bw / 2) + ' ' + by, stroke: steel, w: 1, style: this.flowStyle(true) });
+        // head below each brain
+        const hy = 340;
+        rects.push({ key: 'h' + i, x, y: hy, w: bw, h: 30, rx: 3, fill: 'var(--raised)', stroke: amber });
+        texts.push({ key: 'ht' + i, x: x + bw / 2, y: hy + 20, fill: 'var(--amber-bright)', size: 10, anchor: 'middle', s: 'E' + i + '\u00d76' });
+        edges.push({ key: 'he' + i, d: 'M ' + (x + bw / 2) + ' ' + (by + 62) + ' L ' + (x + bw / 2) + ' ' + hy, stroke: amber, w: 1.4, style: this.flowStyle(true) });
+        pulses.push({ key: 'pp' + i, path: 'M ' + (x + bw / 2) + ' ' + (summary.y + summary.h) + ' L ' + (x + bw / 2) + ' ' + (by + 62) + ' L ' + (x + bw / 2) + ' ' + hy, dur: '1.7s', begin: (i * 0.13).toFixed(2) + 's', r: 2.6, fill: 'var(--amber-bright)' });
+      }
+      texts.push({ key: 'idT', x: startX, y: 138, fill: 'var(--text-muted)', size: 11, anchor: 'start', s: 'identical shared weights' });
+      texts.push({ key: 'acT', x: startX, y: 388, fill: 'var(--text-muted)', size: 11, anchor: 'start', s: 'per-car action' });
+      if (key === 'attn') {
+        for (let i = 0; i < this.E - 1; i++) {
+          const x1 = brainX[i] + bw / 2, x2 = brainX[i + 1] + bw / 2;
+          const ad = 'M ' + x1 + ' ' + (by - 6) + ' C ' + (x1 + 20) + ' ' + (by - 34) + ' ' + (x2 - 20) + ' ' + (by - 34) + ' ' + x2 + ' ' + (by - 6);
+          edges.push({ key: 'at' + i, d: ad, stroke: amber, w: 1.4, style: this.flowStyle(true) });
+          pulses.push({ key: 'ap' + i, path: ad, dur: '1.2s', begin: (i * 0.1).toFixed(2) + 's', r: 2.4, fill: 'var(--amber-bright)' });
+        }
+        texts.push({ key: 'atT', x: (brainX[0] + brainX[this.E - 1]) / 2 + bw / 2, y: by - 40, fill: 'var(--amber-bright)', size: 11, anchor: 'middle', s: 'self-attention \u2014 the cars coordinate' });
+      }
+    }
+
+    return { rects, edges, texts, movers, pulses };
+  }
+
+  renderVals() {
+    let idx = this.state.arch;
+    if (this.props.progress != null && Number.isFinite(+this.props.progress)) idx = Math.round(Math.max(0, Math.min(1, +this.props.progress)) * (this.ARCHS.length - 1));
+    const A = this.ARCHS[idx];
+    const dg = this.diagram(A.key);
+
+    const priorDots = [0, 1, 2, 3].map((i) => ({ key: i, style: { width: '9px', height: '9px', borderRadius: '2px', background: i < A.prior ? 'var(--amber)' : 'var(--border)' } }));
+
+    const sizes = ['S', 'M', 'L'];
+    const scaleRows = this.ARCHS.map((ar) => {
+      const cur = ar.key === A.key;
+      const bars = this.PARAMS[ar.key].map((p, i) => ({
+        key: i, size: sizes[i], label: p + 'k',
+        fillStyle: { height: '100%', width: (Math.log(p) / Math.log(this.PMAX) * 100) + '%', background: cur ? 'var(--amber)' : 'var(--steel)', opacity: cur ? 1 : 0.55, borderRadius: '2px', transition: 'width 300ms' },
+      }));
+      return {
+        key: ar.key, name: ar.label, bars,
+        nameColor: cur ? 'var(--text-bright)' : 'var(--text-muted)',
+        wrapStyle: { padding: '10px 12px', borderRadius: '5px', border: '1px solid ' + (cur ? 'var(--amber)' : 'var(--border)'), background: cur ? 'var(--void)' : 'transparent', opacity: cur ? 1 : 0.7, transition: 'opacity 250ms' },
+      };
+    });
+
+    const archTabs = this.ARCHS.map((ar, i) => ({
+      key: ar.key, idx: i + 1, label: ar.label, onClick: () => this.goTo(i),
+      style: { display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '7px 11px', borderRadius: '3px', cursor: 'pointer', border: '1px solid ' + (i === idx ? 'var(--amber)' : 'var(--border)'), background: i === idx ? 'var(--void)' : 'var(--raised)', color: i === idx ? 'var(--amber-bright)' : 'var(--text-muted)' },
+    }));
+
+    const ctrlStyle = { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', padding: '7px 11px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--text-secondary)' };
+    return {
+      archTitle: A.title, caption: A.caption, verdict: A.verdict,
+      verdictColor: A.verdictBad ? 'var(--coral-bright)' : 'var(--text-secondary)',
+      priorDots, edges: dg.edges, rects: dg.rects.map((r) => ({ ...r, sw: r.sw ?? 1, style: r.style ?? '' })), texts: dg.texts.map((t) => ({ ...t, style: t.style ?? '' })), movers: dg.movers, pulses: dg.pulses,
+      scaleRows, archTabs,
+      toggleShare: this.toggleShare, shareLabel: this.state.share ? 'ON' : 'OFF',
+      shareStyle: { fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', padding: '7px 11px', borderRadius: '3px', cursor: 'pointer', whiteSpace: 'nowrap', border: '1px solid ' + (this.state.share ? 'var(--amber)' : 'var(--border)'), background: this.state.share ? 'var(--void)' : 'var(--raised)', color: this.state.share ? 'var(--amber-bright)' : 'var(--text-muted)' },
+      togglePlay: this.togglePlay, playLabel: this.state.playing ? 'PAUSE' : 'PLAY',
+      playStyle: { ...ctrlStyle, minWidth: '64px', background: this.state.playing ? 'var(--raised)' : 'var(--amber)', color: this.state.playing ? 'var(--amber-bright)' : 'var(--void)', borderColor: 'var(--amber)', fontWeight: this.state.playing ? 400 : 600 },
+      showRail: !(this.props.captureMode ?? false) && this.props.progress == null,
+    };
+  }
+}
+</script>
+</body>
+</html>

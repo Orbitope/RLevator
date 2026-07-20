@@ -903,6 +903,164 @@ Each experiment names: the question, the arms, the rung(s), and the primary metr
   - Eval reminder: each PPO sweep uses baseline obs (default ObservationConfig = harness default, so no obsConfigAssetPath needed) but MUST pass the matching `pattern` arg to `RunScaleLadderSweep` (add a per-(model,pattern) menu item as each model lands). UpPeak reference numbers already on file (M bignet2: PPO 2110.6 / LOOK 2119.2 / ETA 2109.8). Eval output dir naming fixed (`EvalHarness.cs`) to show the actual pattern instead of a hardcoded "-UpPeak" suffix.
   - Headline so far: RL−LOOK delivered gap per pattern × size — **UpPeak: ~0% (parity/slight win) · Interfloor: -14.4% (clear loss)**. Opposite the hypothesized direction; more patterns needed before drawing a conclusion.
 
+### ✅ V1/V2 — PPO baseline on the rewritten traffic, rung M/Midday, nominal load *(2026-07-17)*
+- **Claim:** on the corrected, non-degenerate traffic (post-E15/V0), PPO — the SAME bignet2 (768×4)
+  recipe used throughout E3-E14, no architecture change — is now *competitive with, and beats on most
+  metrics*, the classical heuristics it lost to for the entire project up to this point.
+- **Decisive measurement** (`Runs/20260717-142225-E3-sweep-V2-M-midday-Midday/sweep_summary.csv`,
+  rung M, Midday/interfloor pattern, intensity 1.0 = nominal, 5 seeds, 3600s eval, LOOK vs ETA vs the
+  freshly-trained `elev-v2-m-midday-01` PPO model, 5M steps):
+
+  | policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+  |---|---|---|---|---|---|---|
+  | LOOK | 419.2 | 9.19s | 27.11s | 5.6 | 0.055 | 4,463.6 |
+  | ETA | 411.0 | 7.69s | 26.53s | 14.4 | 0.055 | 4,326.0 |
+  | **PPO** | **424.4** | 8.78s | **25.10s** | **1.0** | 0.079 | **4,483.4** |
+
+  (all figures = mean over seeds 1-5; per-seed rows in the CSV — PPO delivers more than both heuristics
+  in **every single seed**, and abandons almost nobody in any seed: 0/0/0/4/1 vs LOOK's 6/4/4/10/4 and
+  ETA's 16/13/8/17/18.)
+- **Verdict:** **RL wins on reward, delivered count, abandonment, and tail wait (P95) — the first time
+  in this project PPO has beaten LOOK on its own accumulated reward, not just matched it.** RL only
+  loses on *mean* wait, and only to ETA (LOOK is *worse* than PPO there too, 9.19s vs 8.78s). PPO's
+  utilization (0.079) is ~44% higher than either heuristic (0.055) — it is using more of the fleet's
+  capacity, which is exactly how it delivers more people while abandoning almost none: it is not
+  "smarter routing" of the same small number of trips, it is *running the fleet harder*.
+- **Story beat:** this is the payoff act's opening result, and it directly reverses two things: (1) the
+  whole Act II finding that RL was "failing to optimize its own reward" (E13f, util 0.597 vs LOOK's
+  0.754, LOOK beat trained PPO by 28% on PPO's own reward) — here PPO's reward is the *highest* of the
+  three, and its utilization is the *highest*, i.e. the opposite signature; (2) Act III's root-cause
+  claim that the 13x-overloaded benchmark made "sweep continuously" (=LOOK) near-optimal — on the
+  corrected traffic, sweeping continuously is no longer enough, and the policy that works the fleet
+  hardest (PPO) wins. Read together: **E15's traffic-generator fix, not any architecture change, is what
+  unlocked this** — same net, same trainer, same recipe as every losing run before it, on honest traffic.
+  Important caveats before overclaiming: (a) single pattern (Midday/interfloor), single rung (M), single
+  load point (nominal) — the full V2 ladder (S/L rungs, other patterns, stress load) is still open; (b)
+  ETA still wins mean wait, so "RL wins" is metric-dependent, not unconditional — this is exactly the
+  kind of reward-tradeoff question Axis R (V4+) exists to make explicit, not paper over.
+- **Repro:** git commit (this doc + eval menu item added same commit); model
+  `Assets/ElevatorRL/Models/elev-v2-m-midday-01.onnx`; run id `elev-v2-m-midday-01`
+  (`results/elev-v2-m-midday-01/`, config `config/elevator_ppo_e12_interfloor.yaml` unmodified, 5M
+  steps, reward plateaued ~3,100-3,200 by step 2.5M — noted as a *plateau*, not still-climbing, so 5M was
+  not undertrained here); eval menu `Tools/Elevator RL/V1-V2 Sweep (LOOK vs ETA vs PPO, rung M, midday,
+  nominal load, new traffic)`.
+
+**Rung S follow-up (same day, same recipe/pattern/load):** confirms the project's own thesis rather
+than complicating it. `Runs/20260717-174511-E3-sweep-V2-S-midday-Midday/sweep_summary.csv` (model
+`elev-v2-s-midday-01.onnx`, obsSize 98 — baseline obs scales with floors/cars, NOT the 254 used at M):
+
+| policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 250.8 | 5.96s | 16.93s | 0.0 | 0.032 | 2,553.6 |
+| ETA | 250.6 | 5.36s | 15.28s | 0.4 | 0.032 | 2,563.4 |
+| PPO | 251.0 | 5.58s | **13.48s** | 0.0 | 0.040 | 2,543.0 |
+
+Essentially a **three-way tie on delivered/reward** at rung S (all within ~0.8%, no abandonment
+anywhere — the small fleet has slack, so dispatch quality barely moves throughput). PPO still cuts
+tail wait meaningfully (P95 13.5s vs LOOK's 16.9s, ~20% better) but that's the only lever left to pull
+when everyone gets served anyway. **This is the expected, not the interesting, result** — per the
+project's original thesis (`[[rlevator-project]]` memory, 2026-07-09): RL was never expected to beat
+LOOK by much on small buildings where LOOK is already near-optimal; the hypothesis has always been that
+RL's edge shows up at scale/constraint (M/L/Z/H), which is exactly what the M result above starts to
+show. S is the control point that says "the M win isn't just noise across every rung" — it isn't a
+free lunch everywhere.
+**Rung L follow-up (8 cars/30 floors, extended 5M→10M — reward was still climbing at 5M, unlike
+S/M):** `Runs/20260717-225249-E3-sweep-V2-L-midday-Midday/sweep_summary.csv` (model
+`elev-v2-l-midday-01.onnx`, obsSize 648):
+
+| policy | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 634.4 | 10.59s | 30.34s | 16.4 | 0.089 | 7,659.6 |
+| ETA | 619.8 | **9.75s** | 32.20s | 30.0 | 0.089 | 7,362.2 |
+| **PPO** | **649.6** | 10.56s | **28.76s** | **1.6** | 0.108 | **7,931.2** |
+
+**This is the largest, cleanest PPO win of the ladder so far.** PPO beats both heuristics on delivered
+(+2.4% vs LOOK, +4.8% vs ETA), reward (+3.5% / +7.7%), and tail wait (P95 5.5% better than LOOK, 10.7%
+better than ETA) — and cuts abandonment by ~90% vs LOOK and ~95% vs ETA (1.6 vs 16.4 vs 30.0). Same
+pattern as M: ETA still wins on *mean* wait (9.75s), and PPO is running the fleet harder to get there
+(util 0.108 vs ~0.089 for both heuristics, a ~22% increase) — same "runs the fleet harder, not smarter
+routing of the same trips" signature as M, just more pronounced.
+
+**The scale trend across the whole ladder is now visible and matches the project's founding thesis
+exactly:** rung S was a **tie** (RL was never expected to win where LOOK is already near-optimal) →
+rung M was a **clear win** → rung L (bigger, more coordination-dependent fleet) is the **largest win**.
+This is the first time in the project's history that the scale ladder has produced a *monotonic,
+thesis-confirming* trend instead of a confound to explain away — the E15 traffic fix is what made that
+possible. abandonment tells the same story even more starkly: ETA's abandonment nearly doubles S→L
+faster than LOOK's (worse dispatch quality is punished more at scale), while PPO's stays near zero at
+every rung.
+**Stress load (1.5×) at S and M** — completes the nominal/stress pair, trained unattended via the new
+pre-build-then-train workflow (`scripts/batch_v2_queue1.sh`, three 5M-step runs chained with zero Unity
+interaction between them):
+
+| S-stress | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 373.8 | 6.29s | 17.88s | 0.0 | 0.048 | 3,781.2 |
+| ETA | 372.4 | 6.29s | 20.67s | 1.6 | 0.049 | 3,744.4 |
+| PPO | 372.8 | 6.51s | **16.41s** | 0.4 | 0.065 | 3,702.8 |
+
+| M-stress | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 627.2 | **8.88s** | 25.57s | 4.0 | 0.085 | **6,724.8** |
+| ETA | 615.8 | 8.32s | 26.16s | 15.4 | 0.084 | 6,482.8 |
+| PPO | **631.4** | 9.55s | **24.59s** | **0.4** | 0.111 | 6,639.2 |
+
+**S-stress: still a wash**, same as S-nominal — confirms the tie isn't load-dependent, just a
+small-fleet-has-slack effect. **M-stress is a genuine mixed result, not a repeat of M-nominal's clean
+win**: PPO still wins delivered (+0.7%/+2.5%), P95 tail wait, and cuts abandonment ~90%/97% — but LOOK
+edges ahead on total reward (+1.3%) and PPO has the *worst* mean wait of the three (9.55s). **Say so
+plainly: the M win is not uniform across load — nominal load favored PPO cleanly, stress load produces
+a split decision** (PPO wins throughput/tail/abandonment, LOOK wins the accumulated-reward and
+mean-wait columns). This is exactly the kind of result the reward-tradeoff axis (V4+ Axis R) exists to
+make legible rather than paper over with a single "PPO wins" headline.
+
+**UpPeak, rung M, nominal load — the largest, cleanest win of the entire project:**
+
+| M/UpPeak | delivered | waitMean | waitP95 | abandoned | util | rwTotal |
+|---|---|---|---|---|---|---|
+| LOOK | 232.6 | 12.00s | 31.99s | 3.0 | 0.036 | 2,466.8 |
+| ETA | 232.8 | 11.99s | 29.25s | 2.8 | 0.036 | 2,474.2 |
+| **PPO** | **235.4** | **5.79s** | **18.99s** | **0.0** | 0.053 | **2,630.4** |
+
+PPO wins **every single metric, decisively**: delivered (+1.2%/+1.1%), mean wait **cut in half**
+(5.79s vs ~12s for both heuristics — a 52% reduction), P95 tail wait (41%/35% better), zero
+abandonment (vs 3.0/2.8), and reward (+6.6%/+6.3%). **UpPeak was the ONLY pattern ever tested for most
+of this project's history (E1-E11, before E12 discovered that)** — every one of those runs concluded
+"RL doesn't beat LOOK," on the OLD degenerate generator. On the corrected traffic, the exact same
+pattern that anchored the project's original pessimistic narrative is now its single strongest result.
+UpPeak's structure (nearly everyone converging on/from one floor) is plausibly the most learnable/
+exploitable pattern of all — much more so than Midday's distributed interfloor traffic — which may
+explain why the margin here dwarfs every Midday result on the ladder.
+- **Next:** Lunch/DownPeak/day-cycle patterns and rung L at stress load, per the original plan —
+  before calling the pattern×load matrix final. Z/H rungs (zoning/heterogeneous fleets) are where the
+  thesis predicts the RL edge should be largest of all (V-final).
+- **Repro:** all three trained via `scripts/batch_v2_queue1.sh` (chained, zero Editor interaction
+  during training — see the new pre-build-then-train workflow in `CLAUDE.md`); evals via
+  `Tools/Elevator RL/V1-V2 Sweep (... rung S/M, ... STRESS ...)` and `(... rung M, UpPeak ...)`; models
+  `elev-v2-s-midday-stress-01.onnx`, `elev-v2-m-midday-stress-01.onnx`, `elev-v2-m-uppeak-01.onnx`.
+
+### ✅ V0 — Heuristic re-baseline on the rewritten traffic *(2026-07-17)*
+- **Claim:** the corrected traffic generator (E15/V0) is a *solvable* regime with *genuine dispatch
+  leverage* — the opposite of the old degenerate 13×-overload env, and a place where RL can actually
+  demonstrate value.
+- **Decisive measurement** (`Runs/20260717-112117-V0-rebaseline/summary.csv`, LOOK/ETA/ETA-weighted,
+  S/M/L × {UpPeak,DownPeak,Lunch,Midday} × {nominal 1.0, stress 1.5} × 3 seeds, 216 episodes):
+  - **Solvable:** every nominal cell passes the gate — utilization 0.02–0.14, abandonment < 5% (vs the
+    old env's util 0.75 / 33–70% abandon). Load auto-derived per rung (`population = cars·cap·15`)
+    lands all rungs at ~13/slot day-avg (vs old 216/slot).
+  - **Dispatch has leverage:** 7/24 cells show >8% wait-time spread between the heuristics, up to
+    **21%** (L/UpPeak stress: LOOK 13.6s vs ETA 16.5s). **No dominant heuristic** — LOOK wins the
+    hub-heavy cells (UpPeak, big fleets), ETA wins several interfloor cells (M/Midday: 7.6 vs 8.9s).
+- **Verdict:** PASS. Proceed to V1/V2 with `intensity` 1.0 = nominal, 1.5 = stress. (Load is on the
+  light side — util rarely > 0.3 — but that is realistic and matches the paper; dispatch quality shows
+  up in wait time, not throughput. Leverage concentrates at rungs M/L and the UpPeak/Midday patterns.)
+- **Story beat:** after E15 exposed the 13×-overload artifact and we rewrote the generator, the
+  re-baseline confirms the fix landed: heuristics now *disagree* (they were near-identical on the
+  saturated env because everything just swept), and neither is optimal — so "does RL beat the
+  heuristics?" is finally a fair, non-degenerate question. This is the reset the whole investigation
+  needed.
+- **Repro:** code `cdf9724`; eval menu `Tools/Elevator RL/V0 Re-baseline Sweep`.
+
 ### 🚨 E15 — TRAFFIC REALISM: our environment, not RL, may be the story *(2026-07-16, from reading the paper's generator)*
 **Prompted by "review our traffic generation vs the paper's". This is the most consequential finding
 of the session and it reframes E2-E14.** Read `Passenger.py` (`PassengerGenerator`, `get_rate`,
@@ -1609,6 +1767,330 @@ the M1/M2 milestones below.
    headlessly vs LOOK (§7). Remaining: Play-mode check of the commitment loop, then train AS0 vs
    AS1 and compare sample-efficiency/asymptote.
 7. **M6 — Stretch + write-up (E8).** Fairness, transfer, emergent-strategy visuals.
+
+---
+
+## 9. Simulacrum tensor-env port (`sim/rlevator/`) — VALIDATED
+
+A Unity-free, differential-tested batched PyTorch port of the simulation core (E15 traffic
+generator included), built spec-first with the simulacrum framework (local checkout
+`~/projects/simulacrum`, v0.1.0). Motivation: training never needs the Editor, but *iterating* on
+env/config does (build → train → eval round-trips, the project's standing bottleneck); a validated
+tensor env opens a fully headless, batched-rollout training path.
+
+- **Claim.** The S-rung sim (AS0 primitive actions, 7 default obs blocks, Midday @ intensity 1.0,
+  fixed 3-car fleet) is semantically ported: two independent implementations (readable
+  `reference.py`, batched `fast.py`) written from one spec are **bit-identical** to each other, and
+  the port reproduces Unity's traffic statistics and LOOK service quality.
+- **Decisive measurement.** (a) `sim/rlevator/validation_report.json` — `overall_pass: true`,
+  10/10 battery tests: differential parity (8 seeds × 300 steps, states/rewards/obs compared at
+  zero tolerance — **no `x-atol` anywhere**, the port is all-integer state by design), batch
+  independence, invariant sweep (8 invariants), auto-reset, determinism, replay,
+  torch.compile parity (bit-checked vs eager). (b) Unity cross-check, LOOK on 10 × 1024 s Python
+  episodes vs the V2 S-rung sweep (`Runs/20260717-174511-E3-sweep-V2-S-midday-Midday`): queue-wait
+  mean **5.79 s vs Unity 5.96 s**, P95 **15.50 s vs 16.93 s**, abandonment 0 = 0. Delivered:
+  Unity's 250.8 equals **98.8% of the analytic expected arrivals (253.8)** of the ported rate
+  model integrated over Unity's own post-warmup window [300 s, 3600 s); the Python env delivers
+  97.4% of the same model's expectation over its window. The apparent 281-vs-251/hr delivered gap
+  is pure eval windowing (warmup exclusion + time-varying bins), not generator drift.
+- **Reproducibility handle.** Package `sim/rlevator/` (spec.md = single source of truth;
+  `schema.json`; `reference.py`; `fast.py`; `look.py` = CollectiveLook port used as the pinned
+  ScriptedPolicy, expected return 837.17 ± noise on seeds 1000-1019); `validation_report.json`
+  embeds the git sha. Battery: `cd sim/rlevator && <simulacrum venv>/python -m pytest tests/`.
+- **Verdict.** Port validated and eligible as a training substrate for rung S. Deliberate,
+  documented deviations (spec.md "Provenance"): counter-based per-episode RNG instead of Unity's
+  two never-reseeded `System.Random` streams; 0.1 s integer ticks instead of 0.02 s float physics;
+  single-uniform inverse-CDF Poisson instead of Knuth; **Midday not UpPeak** as the fixed pattern
+  (UpPeak@1.0 saturates S — §E3 note). Trajectories are distribution-equivalent, not
+  bit-comparable, to Unity.
+- **Throughput — measured vs headless Unity (the reason we migrated).** Apples-to-apples, same
+  M-series laptop, headless both sides, learner included both sides (`sim/rlevator/bench.py`,
+  2026-07-18). **Baseline:** the actual rung-S PPO run `results/elev-e2-s-ppo-01` (headless build,
+  `--num-envs=20 --no-graphics`) did 5,000,192 steps in 4010.7 s = **1,247 agent-steps/s**.
+  **Tensor env, end-to-end** (compiled rollout + a 256×2 PPO update matching the config), best at
+  N=2048: **46,479 agent-steps/s = 37× Unity** — a 5M-step rung-S run drops from **66.8 min → ~1.8
+  min**, CPU-only, free, fully Editor-free. Env-only (no learner) saturates ~**102k steps/s** at
+  N≈4k–16k. Findings: `torch.compile` ≈ 3× (fuses the op-heavy 5-sub-tick step); batching gains
+  flatten past N≈16k (compute-bound on 5 cores); the learner pulls the end-to-end sweet spot down
+  to N≈2048. Caveats: rung S only (L/Z/H have larger state — ratio expected to hold since Unity
+  slows too, but unconfirmed); throughput not convergence (same 5M steps either way, only
+  wall-clock/step changed); CPU only — a CUDA GPU is the next lever, and the point at which a
+  JAX/cloud rewrite would be re-evaluated (see the migration decision log below). Reproduce:
+  `<simulacrum venv>/python -m rlevator.bench` from `sim/`.
+- **Story beat.** E15's lesson (the benchmark itself can be the bug) motivated porting the sim
+  onto a harness whose whole design is catching silent divergence: spec-first, two independent
+  implementations, differential-tested at zero tolerance. The battery passed on the first full
+  run — the discipline moved the debugging to spec-writing time. One hypothesis died on schedule:
+  the LOOK cross-check first showed Python delivering 12% more per hour than Unity ("the port's
+  generator drifted?"); integrating the rate tables analytically over each eval's actual window
+  explained the entire gap (Unity's warmup exclusion + different day-profile bins) — the
+  generator matches to <1.2%.
+
+### 9.1 Migration decision log — why we left Unity, options weighed (2026-07-18)
+
+**Problem.** The Unity loop's cost isn't training (that's already headless via `start_training.sh`)
+— it's *iterating*: build → train → eval round-trips gated on the Editor, which we cannot drive
+programmatically (licensing) and which goes unresponsive under load. That serializes every
+experiment behind manual Editor windows.
+
+**What we measured.** Headless Unity rung-S PPO = 1,247 steps/s; the tensor env end-to-end = 37×
+that on the same laptop, turning a 67-min run into ~2 min (§9 Throughput). Decisive because it is
+same-machine, headless-both-sides, learner-both-sides.
+
+**Options weighed for "fast + Claude can drive it end-to-end":**
+- **Mac CPU, tensor env (CHOSEN).** 37× over headless Unity, free, no rewrite, fully shell-drivable
+  (no Editor). Deemed *enough on its own* for the iteration workflow. Env saturates ~102k/s;
+  learner-bound sweet spot N≈2048.
+- **Mac GPU (MPS).** Rejected for now: simulacrum's RNG is int64 splitmix64 (64-bit wrapping mul +
+  masked shifts) — the single most MPS-hostile thing in it; would need a 32-bit counter RNG
+  (Philox/Threefry) rewrite just to *maybe* work on a small GPU. Low leverage.
+- **Cloud GPU via CLI (Modal/RunPod).** The real escalation path: CUDA is simulacrum's happy path
+  (no rewrite), pennies/run, and shell-drivable exactly like local. Hold in reserve for big rungs /
+  many concurrent experiments where ~2 min/run × N becomes the bottleneck. Note: **Colab is *not*
+  this path** — its notebook UI isn't a scriptable job surface for an agent; the CLI-drivable free
+  TPU is TPU Research Cloud, not Colab.
+- **JAX rewrite (+ TPU/CUDA).** Highest ceiling, but a full rewrite; revisit only if cloud-CUDA
+  proves insufficient. simulacrum's spec + differential-test discipline ports; the backend swaps
+  under it.
+
+**Decision.** Bank the local 37×; keep training + eval in the tensor env on this Mac. Re-evaluate
+cloud-CUDA (then JAX) only when a *measured* scale run (rung L/Z/H, intensity ≥ 1.5, or an
+experiment sweep) shows the local path too slow — not preemptively.
+
+**Prerequisite this exposed.** Apples-to-apples RL-vs-baseline comparison now requires a **Python
+eval harness** mirroring Unity's §5 metrics + eval protocol (fixed tape, warmup window), since the
+Unity eval pipeline is no longer in the loop. Built next (§9.2).
+
+### 9.2 Python eval harness (`sim/rlevator/eval.py`) — VALIDATED vs Unity (2026-07-18)
+
+Editor-free reimplementation of Unity's `EvalHarness` + `StatsCollector`, so a tensor-trained
+policy is scored on the identical protocol as the Runs/ CSVs and "every RL number relative to
+LOOK" (§5) survives the migration.
+
+- **Claim.** The Python harness reproduces Unity's eval metrics
+  (`delivered,waitMean,waitP95,waitMax,abandoned,rejected,util,rwTotal`) under the same protocol
+  (3600 s episode, 300 s warmup, per-decision util sampling, 64-bin `WaitHistogram` with in-bin
+  linear-interp P95) on the same rung-S Midday @ 1.0 traffic.
+- **Decisive measurement.** LOOK, seeds 1–5, vs `Runs/20260717-174511-E3-sweep-V2-S-midday-Midday`:
+  waitMean **6.01 vs 5.96 s (+0.8%)**, waitP95 **16.49 vs 16.93 s (−2.6%)**, waitMax 29.84 vs 30.09,
+  delivered 244.6 vs 250.8 (−2.5%), util 0.030 vs 0.031, abandoned 0.2 vs 0, rejected 0/0. All
+  within the semantic-port's RNG divergence (different traffic realizations), not metric error —
+  the metric *definitions* match. Reproduce: `<venv>/python -m rlevator.eval --policy LOOK
+  --seeds 1-5 --compare Runs/…/sweep_summary.csv`.
+- **Implementation note.** Metrics ride an **opt-in** path in `fast.py` (`collect_metrics=True`):
+  a metrics-only `rider_wait` tensor carries each rider's frozen queue-wait so wait is tallied at
+  *delivery* (Unity's definition), plus per-instance delivered/abandoned/rejected/util/reward
+  accumulators zeroed at the warmup boundary. **Off by default** → the training/differential/bench
+  path is bit-unchanged (battery re-run as the regression gate). The eval also lifts the port's
+  2048-decision training horizon to 7200 (3600 s) by extending the periodic rate tables
+  (`max_decisions=` ctor arg) — exact, since the rate model is periodic in the sub-tick index.
+- **Verdict.** Eval pipeline trustworthy for rung-S LOOK; ready to score trained RL policies. ETA
+  port deferred (LOOK is the anchor baseline). Next: train PPO on the tensor env and run the full
+  LOOK-vs-RL comparison end-to-end in Python (reproduce E2's "PPO beats LOOK on S" verdict through
+  the new pipeline before pushing to rung L).
+
+### 9.3 End-to-end RL on the tensor env — S reproduced, M is the first scale win (2026-07-18)
+
+Full Python train→eval loop (`sim/rlevator/{train.py,policy.py,dqn.py}`), no Editor. PPO is a
+MultiDiscrete actor-critic (E size-6 heads) with AS0 action masking; eval is greedy+masked
+(matching Unity's `deterministic_discrete_actions`). All numbers greedy, seeds 1–5, vs the
+LOOK baseline scored on the identical protocol.
+
+- **Eval-mode subtlety (the trap).** A diffuse/under-converged policy can be competent when
+  *sampled* yet degenerate under *greedy* argmax — a full car parks on the still-legal "board"
+  no-op. On S, 3M PPO greedy delivered ~6 vs ~240 sampled. Two fixes made greedy robust:
+  **(1) mask "board" when the car is full** (LOOK never boards a full car, so it's fair; removes
+  the attractor), **(2) anneal entropy fully to 0** so the greedy mode sharpens.
+- **D3QN detour (rejected).** Value-based `argmax Q` has no diffuse-mode problem, so D3QN
+  (`dqn.py`, Double+Dueling, joint 6^E actions) was tried. It *is* robust (no collapse, any seed)
+  but its quality is much worse — S 10M: waitMean **10.2 s vs LOOK 5.9**, abandoned 8 vs 0. PPO
+  learned the better policy; its only flaw (greedy brittleness) was directly fixable. Decision:
+  **PPO, not D3QN** ([[rlevator-rl-algorithm]]).
+- **Rung S — DONE, RL ties LOOK.** Fixed-PPO (256×2, 5M): delivered 245 vs 251, waitMean **5.85 s
+  vs 5.9**, waitP95 **16.2 vs 16.9**, abandoned **0 vs 0**, no collapse on any seed. Reproduces
+  E2's "PPO matches LOOK on S" through the fully Python pipeline. Handle: `models/ppo_s_fixed.pt`.
+- **Rung M — env parameterized + validated, RL BEATS LOOK.** Env made rung-configurable
+  (`RLEVATOR_RUNG`; only F,E differ; rate-table F-arithmetic generalized; per-rung schema via
+  `schema_gen.py`). Differential battery green at M (9/9 core; scripted-policy gate re-pinned per
+  rung, LOOK@M=1479.77). Python LOOK@M matches Unity `V2-M-midday` within noise (delivered −0.3%,
+  waitMean −1.3%). **Result:** naive 256×2/5M PPO *collapsed* (rediscovering E6: M needs a bigger
+  net); bignet2 (768×4, 10M) then **beat LOOK** — delivered 421 vs 418, waitMean **7.5 s vs 9.1
+  (−18%)**, waitP95 **21.1 vs 26.1 (−19%)**, abandoned **0.8 vs 3.4**, robust greedy on all seeds.
+  Handle: `models/ppo_m_bignet.pt`.
+- **Rung L — env validated; PPO training in progress (2026-07-18).** L (F=30, E=8, obs 648,
+  6^8 joint actions — PPO's per-car heads scale as-is, no VDN needed). Differential battery green
+  at L (10/10; LOOK@L return pinned 2548.30). Python LOOK@L matches Unity `V2-L-midday` on the
+  wait metrics near-exactly (waitP95 −0.0%, waitMean −1.7%, waitMax +0.5%); delivered runs +6.8%
+  (traffic-realization variance at L's higher volume — the tight wait match confirms dynamics are
+  correct). LOOK@L baseline: delivered ~678, waitMean 10.4 s, waitP95 30.3, abandoned 14.6 —
+  harder than M, where the thesis predicts RL's margin should widen. LOOK@L baseline: delivered
+  ~678, waitMean 10.4 s, waitP95 30.3, abandoned 14.6.
+- **Rung L — RL FAILS to beat LOOK with the flat-MLP recipe (2026-07-18).** PPO bignet2 (768×4,
+  10M) greedy: delivered mean ~353 (52% of LOOK's 678), abandoned ~322 (vs 14.6), and **highly
+  seed-variable** (delivered 165–593). The training curve degraded — ep_ret **1070→714 in the
+  final updates**, i.e. the policy collapsed once entropy annealed to 0 (premature exploitation),
+  and even its *peak* (~1070) sat far below LOOK's return (2548). So the recipe that ties LOOK at
+  S and beats it at M **does not scale to L's 8-car coordination** — consistent with the thesis
+  (big-fleet coordination outgrows a flat MLP; cf. E6 architecture arm, E11 attention) but also an
+  unstable-training artifact. Handle: `models/ppo_l_bignet.pt` (final, post-collapse).
+  Next: one targeted retry (gentler entropy anneal + periodic checkpointing to keep the best) to
+  separate "premature-collapse" from "under-capacity".
+- **Rung L — CORRECTION: the failure was training instability, not architecture (2026-07-18).**
+  The retry (flat 768×4, `ent_frac 0.9` so entropy anneals over 90% not 60%, best-by-proxy
+  checkpoint) is robust and **~ties LOOK**: delivered 665 vs 678, waitMean **9.45 s vs 10.4
+  (−9%)**, waitP95 **28.4 vs 30.3 (−6%)**, abandoned 20 vs 14.6 (worse), no collapse on any seed
+  (peak ep_ret 1868 vs the collapsed attempt's 714). So flat-MLP is NOT broken at L — the first
+  attempt's collapse was premature entropy annealing. Net at L: a tie-to-slight-win (better mean
+  wait, slightly more abandonment). Handle: `models/ppo_l_bignet2.pt`. Lesson: **best-by-proxy
+  checkpointing + gentler entropy schedule** are now the default (train.py). The alt architectures
+  (conv/percar/attn, `policy.py make_net`) are therefore about pushing *further* above LOOK and
+  resolving the wait/abandonment trade — not rescuing a failure. Arch sweep next.
+- **Arch sweep @ M — debugging via short (1.5M-step) learning tests (2026-07-18).** Recipe 512×3,
+  `ent_frac 0.9`, best-ckpt; learning check = ep_ret positive by ~1.5M (flat reaches +450).
+  `_split_obs` verified bit-exact (not a fault). **percar LEARNS** (ep_ret +200 @ 1.5M) → per-car
+  infra sound. **conv had a real bug:** the first impl fed the per-car head only conv-pooled floor
+  features + motion/load and NEVER passed each car its own rider destinations (`carButtons_i`) —
+  buried/pooled in the conv — so a car couldn't see where its riders wanted to go and stayed
+  negative across 4 variants. Fix: give the conv head each car's own-view (carFloor_i+carButtons_i)
+  next to the conv local(at-its-floor)+pooled context. Then conv **learns strongest**: ep_ret
+  **+647 @ 1.5M** (> flat +450). Adopted: **short learning-checks before full runs** (caught it in
+  ~3 min vs 50). conv is ~3k steps/s (Conv1d on CPU ~7× slower than the flat MLP). Full conv@M +
+  eval running; then percar/attn full, then the strongest at L.
+- **Arch deep-dive (correctness) + eval results @ M.** Sensitivity check (flip a car's rider
+  destinations, measure its own-logit change): all 4 archs correctly route own-dest info to the
+  car (flat 0.052, conv 0.034, percar 0.015, attn 0.173); attn additionally shows strong cross-car
+  coupling (others 0.056 vs percar 0.006) = coordination working as designed. No info-flow bugs.
+  Eval (greedy, seeds 1-5) vs LOOK (delivered 418 / waitMean 9.1 / P95 26 / abandon 3.4):
+  - **flat 768×4/10M:** 421 / **7.5** / **21.1** / **0.8** — beats LOOK (the M win).
+  - **conv 512×3/6M:** 395 / 8.9 / 31.6 / 26 — trains well (ep_ret 1326 > flat's 1258) but eval is
+    WORSE (worse tail, 30× the abandonment). The floor-conv prior does not help at M; conv
+    optimizes reward yet delivers worse service quality. Verified-correct, just not better here.
+  - **percar 512×3/8M:** 416 / 8.9 / 27 / 5 — ~ties LOOK, worse than flat (again trains to higher
+    ep_ret 1366 > flat 1258 but deploys worse). Verified-correct.
+  - **attn 512×3/8M:** 418 / **8.0** / **23.9** / 3.4 — the BEST structured arch, beats LOOK on
+    wait+tail with a smaller net than flat, highest train reward (1449). Still 2nd to flat@M.
+  - **Final M ranking: flat > attn > percar ≈ LOOK > conv.** attn (coordination) is closest to
+    flat; conv (floor-conv) is worst. Decisive test is L (8-car coordination) — attn@L vs flat@L.
+- **Arch verdict @ L + cross-rung conclusion (2026-07-18).** attn@L (512×3/10M) greedy: delivered
+  673 / waitMean 10.2 / P95 30.7 / abandon 19.2 — **does NOT beat flat@L** (665 / 9.45 / 28.4 / 20);
+  they tie, both ≈ LOOK. Yet attn@L trained to ep_ret **2421** vs flat@L's 1868 — far higher
+  reward, ~same deployment. **Conclusion: flat MLP is the best/tied-best architecture at every
+  rung; the coordination priors (attn/percar/conv) reliably optimize the SHAPED REWARD better but
+  do not deploy better, because the reward is imperfectly aligned with the wait/abandon metrics.
+  The bottleneck is the reward/objective, not the architecture** (E13f from the other side).
+  Practical takeaways: (1) keep **flat** as the trainer arch; (2) the highest-leverage next lever
+  is **reward shaping** (align the objective with wait/abandon — e.g. the toward/away shaping the
+  structured archs exploited is a prime suspect), not more architecture. All archs are
+  deep-dive-verified correct (`policy.py make_net`, sensitivity-checked); models saved as
+  `models/ppo_{m,l}_{conv,percar,attn}.pt`.
+
+### 9.4 Reward shaping (E10): removing toward/away shaping is a clean win (2026-07-18)
+
+Followed directly from §9.3's "reward is the bottleneck" finding. The ±0.4 toward/away movement
+shaping was the term the structured archs exploited for higher reward without better service.
+Ablation via `RLEVATOR_SHAPING=off` (zeros R_TOWARD/R_AWAY; both impls read it, differential
+parity unaffected; service metrics are reward-independent so eval is apples-to-apples).
+
+- **Claim.** Removing toward/away shaping improves the deployed policy — the movement bonus was a
+  misaligned incentive, not a helpful guide.
+- **Decisive measurement (flat 768×4, rung M, greedy, seeds 1-5).** No-shaping vs shaped vs LOOK:
+  waitMean **6.85 vs 7.5 vs 9.1**, waitP95 **18.0 vs 21.1 vs 26**, abandoned **0 vs 0.8 vs 3.4**,
+  delivered 422 vs 421 vs 418. No-shaping is **strictly better** than shaped and beats LOOK by
+  **−25% mean wait / −31% tail / zero abandonment** — the best M policy to date. Handle:
+  `models/ppo_m_noshaping.pt`.
+- **Confirmed at L — turns the tie into a win.** flat@L no-shaping (768×4/15M) greedy: delivered
+  686 / waitMean 9.84 / P95 28.3 / **abandoned 3.0** vs shaped@L (665 / 9.45 / 28.4 / 20) and LOOK
+  (678 / 10.4 / 30.3 / 14.6). The dramatic effect is **abandonment 20 → 3.0** (vs LOOK 14.6) with
+  wait/delivery still ahead of LOOK. Handle: `models/ppo_l_noshaping.pt`.
+- **Verdict.** The toward/away term hurts at BOTH rungs. With the corrected reward, **RL (flat)
+  cleanly beats LOOK at M and L** — thesis validated at scale, and the decisive lever was the
+  objective, not the network (§9.3).
+- **Arch conclusion robust under corrected reward.** attn@M no-shaping (512×3/8M) greedy: waitMean
+  8.7 / P95 26.9 / abandon 4.0 — barely beats LOOK and **loses to flat@M no-shaping** (6.85/18.0/0).
+  Removing the shaping *helped flat* but left attn ~tied with LOOK (attn was marginally better WITH
+  the shaping it exploited). So **flat wins under both reward variants** — "flat is best" doesn't
+  depend on the shaping. **Combined best policy: flat MLP + `RLEVATOR_SHAPING=off`**, beating LOOK
+  decisively at M and L.
+- **Done since:** no-shaping is now the DEFAULT reward (§9.4), re-validated (battery green under
+  the new default; LOOK returns re-pinned per rung). Remaining untested-in-tensor arcs: stress
+  intensity / other patterns (parameterize like RUNG/SHAPING), **E7 fleet generalization**
+  (randomizeActive; RNG slots reserved), further reward alignment (queue-weighted penalty).
+
+### 9.5 Zoning (E4): ported & validated, but the experiment is deferred (2026-07-18)
+
+Per-car floor bands added to the tensor env (rungs **Z** = 30fl/8cars nested 0-14×2/0-22×3/0-29×3,
+**H** = 40fl/10cars; `CAR_MIN/MAX_FLOOR` per rung; movement + action mask + LOOK claiming all
+band-aware; non-zoned rungs bit-unchanged). **Differential battery green at Z (10/10)** — the port
+is correct and reusable. `models/`… none (not trained).
+
+**Why the E4 experiment is deferred, not run:** at the default intensity 1.0, rung Z is an
+**overload**, and it's ill-posed for a clean LOOK-vs-RL comparison for two reasons:
+1. Z carries L's full load (population 960) but only 3 of 8 cars serve the top half, so **LOOK
+   itself collapses**: delivered ~490 but **~192 abandoned** (vs 14.6 at L), waitP95 ~42 s (at the
+   45 s cap), rwTotal negative. Unity only ever ran Z at intensity ~0.0-0.1 (10-30× lighter); there
+   is no Unity Z@1.0 baseline.
+2. **Partial-observability wall:** neither LOOK nor RL sees a *waiting* passenger's destination
+   (default obs) and boarding is indiscriminate, so **neither can avoid mis-boarding** a rider into
+   a car that can't reach their floor. RL's only lever is routing, not boarding — so it cannot fix
+   the mechanism that breaks zoning. RL@Z@1.0 would give a muddy "both struggle" result, not a
+   clean win.
+
+**To do zoning *right* (future):** run Z at a viable lower intensity (parameterize intensity) AND
+add the destination/OD observation (E5/E13d) so mis-boarding is avoidable — then it's a real
+coordination test. The port is ready for that. Decision: **skipped for now** — the thesis's core
+claim (RL beats LOOK at scale) is already cleanly shown at M/L via §9.3-§9.4.
+  - **Pattern @ M: flat wins; conv/percar/attn train to higher shaped-reward but deploy worse**
+    (more abandonment / worse tail). At M (16 floors, 5 cars) a wide flat MLP already handles the
+    problem; the structural priors cost expressiveness without a coordination payoff. Caveat: flat
+    ran 768×4/10M vs alt archs 512×3/8M — not identical capacity, but the alt archs' *higher* train
+    reward rules out simple undertraining. The thesis says arch should matter at **L** (8-car
+    coordination) — the coordination archs (percar/attn) go to L next as the decisive test.
+- **Caveats (do not overstate).** (a) This M win is *stronger* than Unity's E6 (which only
+  *matched* LOOK) — likely the board-when-full mask + 10M training; **attribute before leaning on
+  it** (re-run M without the mask). (b) PPO's total reward at M (~4300) ≈ LOOK's — it wins on
+  *wait* at comparable reward (a real service-quality gain, not reward-hacking). (c) The bignet2
+  ep_ret proxy (~1258) sits below LOOK's training return (~1479); the deployment metrics, not the
+  shaped reward, are the comparison.
+- **Story beat.** The migration's payoff compounds: S proves the pipeline (RL ties LOOK, as the
+  thesis predicts for a small building); M is the first rung where RL *beats* the heuristic — but
+  only after the port rediscovered, the hard way, two things already in this plan (greedy-eval
+  brittleness ≈ E13c's train/eval mismatch; "M needs a bigger net" = E6). Next: **rung L** (6^8
+  joint action forces VDN/QMIX factoring, or keep PPO's per-car heads which scale as-is), and
+  **attribute the board-mask edge** at M.
+
+### 9.6 Article site (`docs/`) — static GitHub Pages build (2026-07-19)
+
+The public writeup: a scrollytelling article + interactive visualizations, served statically from
+`docs/` (enable Pages: deploy-from-branch, default branch, `/docs`). Built from the ContentKit
+`.dc.html` visualization package (companion deliverable), completed with prose (technical/
+structured register) and the real §9.3–9.4 results.
+
+- **What shipped.** `docs/index.html` = 6-scene scrolly (Background → Observation → Reward →
+  Architecture → Playground → Results) + a full-width technical tail (setup, training & eval
+  protocol, findings tables, limitations, what's-next/resources). Scenes: fact-checked Background
+  (Miconic 10 1990, Otis Elevonic/RSR 1979, Crites & Barto 1996 — RL card era corrected from
+  "2010s" to "1996 · now"); Results viz adapted to **building-size × reward selectors** fed by
+  `results.json`, which `sim/rlevator/make_results.py` REGENERATES from the saved checkpoints
+  (17 eval runs, seeds 1–5 — measured, not transcribed; regen is deterministic and matches §9.3/9.4).
+  Fully static: React/ReactDOM/Babel vendored into `docs/vendor/` (SRI-verified against the pinned
+  unpkg versions), zero third-party requests.
+- **Portability fixes made (kept minimal, documented here for the package's future use).**
+  (a) The three scroll-driven scenes indexed arrays by an unguarded `progress` prop — NaN/non-
+  numeric progress crashed renders (present in the author package's own article); guarded with
+  `Number.isFinite`. (b) The article shell was refactored from inner-scroller to window-scroll +
+  sticky stage so the technical tail can follow in normal flow; scenes now **mount progressively**
+  (on approach, then stay mounted) — six simultaneous streaming imports raced the dc-runtime.
+  (c) Scroll handling listens on window+document and falls back to a 250 ms scrollY poller with
+  direct compute (rAF starves in embedded/backgrounded viewers; innerHeight can be 0 — uses
+  clientHeight with an 800 px floor). (d) Arch-scene "flat breaks down at L" verdict corrected to
+  hypothesis framing (§9.3 disproved it).
+- **Verification.** Served locally; zero external requests; full JS walk: scene cross-fades track
+  scroll 0→5, progress drives Observation beats / Architecture stages, Results loads `results.json`
+  (badge MEASURED) with the per-cell method gaps as designed; standalone scene pages render
+  pixel-verified. Known cosmetic: the dc-runtime logs transient streaming-mount errors that it
+  recovers from — identical noise exists in the author's original article shell.
+- **Handles.** `docs/` (self-contained), `sim/rlevator/make_results.py` (data pipeline),
+  screenshots in the package for og-image (`docs/og.png`).
 
 ---
 

@@ -70,7 +70,7 @@ namespace ElevatorRL
         /// The paper's inter-arrival formula (`Passenger.py:get_rate`): iat = 300 / (ar * pop / 100),
         /// so arrivals/sec = ar * population / 30000. Their population is 1200 over 20 floors with
         /// 4 cars x capacity 20 (= 80 slots). Ours defaults lower because our fleet is smaller —
-        /// see TrafficConfig.population.
+        /// see TrafficConfig.loadPerSlot (population is derived per rung in Building.UpdatePattern).
         /// </summary>
         static float RatePerSecond(float ar, int population) => ar * population / 30000f;
 
