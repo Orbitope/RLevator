@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Teaching a Building to Move Its Elevators — an RL case study</title>
-<meta name="description" content="A reinforcement-learning case study in elevator dispatch: a hand-built simulator, PPO, and honest head-to-head measurement against the LOOK heuristic. RL ties the heuristic in a small building and beats it in bigger ones — but the decisive change wasn't the network.">
-<meta property="og:title" content="Teaching a Building to Move Its Elevators">
-<meta property="og:description" content="An interactive RL case study: what the agent sees, how it's scored, how its brain is wired — and what actually beat the classic elevator heuristic.">
+<title>What's Taking So Long? — an RL elevator-dispatch case study</title>
+<meta name="description" content="Elevator dispatch is a solved problem — until you're the one waiting. A reinforcement-learning case study: a hand-built simulator, PPO, and honest head-to-head measurement against the seventy-year-old LOOK heuristic. RL ties it in a small building and beats it in bigger ones — but the decisive change wasn't the network.">
+<meta property="og:title" content="What's Taking So Long?">
+<meta property="og:description" content="Elevator dispatch is solved — unless you're waiting for one. An interactive RL case study: what the agent sees, how it's scored, how its brain is wired, and the one change that actually beat the classic elevator heuristic.">
 <meta property="og:image" content="og.png">
 <meta property="og:type" content="article">
 <script src="./support.js"></script>
@@ -48,8 +48,8 @@
 
         <section style="min-height:92vh;display:flex;flex-direction:column;justify-content:center;padding:60px 0 40px;">
           <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--amber);">Reinforcement learning &#183; case study</div>
-          <h1 style="font-family:var(--font-display);font-weight:700;font-size:44px;line-height:1.04;color:var(--text-bright);margin:14px 0 0;text-wrap:balance;">Teaching a building to move its elevators</h1>
-          <p style="font-size:16px;line-height:1.6;color:var(--text-secondary);margin:18px 0 0;">An agent watches a building, commands its cars every half-second, and is scored on how well it serves people. I built the simulator twice on purpose, trained a policy against a fifty-year-old heuristic, and measured everything head-to-head. Scroll to see what the agent sees, how it is rewarded, how its brain is wired &mdash; and which change actually mattered.</p>
+          <h1 style="font-family:var(--font-display);font-weight:700;font-size:44px;line-height:1.04;color:var(--text-bright);margin:14px 0 0;text-wrap:balance;">What&rsquo;s taking so long?</h1>
+          <p style="font-size:16px;line-height:1.6;color:var(--text-secondary);margin:18px 0 0;">Elevator dispatch is a solved problem &mdash; the rules that run most buildings are seventy years old and genuinely good. Solved, anyway, until you&rsquo;re the one in the lobby watching every car idle on the wrong floor, wondering what the holdup could possibly be. That&rsquo;s the wait that made me try to beat the status quo: a learned policy against the incumbent, on identical traffic, measured honestly &mdash; where it earns its keep, and where it doesn&rsquo;t. Scroll to see what the agent sees, how it&rsquo;s scored, how its brain is wired &mdash; and the one change that actually mattered.</p>
           <p class="mobile-note" style="font-size:13px;line-height:1.5;color:var(--text-muted);margin:16px 0 0;">The interactive visualizations need a wider screen &mdash; on mobile you'll get the prose and the tables.</p>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:26px;letter-spacing:0.1em;">&#8595;&#160;&#160;scroll</div>
         </section>
