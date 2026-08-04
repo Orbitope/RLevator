@@ -38,6 +38,24 @@ Supporting: the whole simulator was rebuilt out of Unity/ML-Agents into a pure t
 
 ---
 
+## Live sandbox — hero image, undecided
+
+`sandbox.dc.html` is a real ticking simulation, not a static figure — an actual building with cars
+that travel between floors, load and unload, while queues and cumulative reward update live. It's a
+stronger visual than any bar chart, so three variants were captured rather than picking one:
+
+| File | What it shows |
+|---|---|
+| `sandbox-live.png` / `.mp4` / `.gif` | 10 floors / 4 cars, midday traffic — busiest but still legible |
+| `sandbox-live-uppeak.png` / `.mp4` / `.gif` | same size, up-peak — the classic lobby-rush look, cleaner read |
+| `sandbox-live-mrung.png` / `.mp4` / `.gif` | 16 floors / 5 cars, midday — the article's actual M rung, denser |
+
+**Not yet chosen.** The Reddit and X drafts below still point at `results-M-unshaped.png` and the
+scrollytelling clips. Swap the lead image on whichever post to one of these three once you've picked
+a favorite — the sandbox clip is arguably the stronger opener for X in particular.
+
+---
+
 ## Reddit — r/reinforcementlearning · Tue 1 Sep
 
 **Title**
@@ -174,6 +192,7 @@ controls rather than guessing at scroll positions. Nothing is redrawn.
 | `reward.png`, `reward-selector.png` | the seven-force reward and its coefficient panel |
 | `architectures.png` | flat MLP vs conv vs per-car vs attention |
 | `og.png` | the article's existing social card (pre-existing, not captured) |
+| `sandbox-live*.png` / `.mp4` / `.gif` (3 variants) | the live ticking building sandbox — see "Live sandbox" above |
 
 ---
 
