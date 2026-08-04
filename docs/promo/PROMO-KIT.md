@@ -175,6 +175,46 @@ https://orbitope.github.io/rlevator/
 
 ---
 
+## LinkedIn — Wed 2 Sep
+
+Short post + link, matching the format that already worked for you — not a long-form narrative.
+Body stays link-free; post the link yourself as the first comment once it's up.
+
+**Post**
+
+```text
+I spent months trying to beat a 70-year-old elevator dispatch heuristic with reinforcement learning.
+On a mid-size building (16 floors, 5 cars), the trained policy cut mean wait time from 9.07s to
+6.86s and abandonment from 3.4 people to 0 — same traffic, same seeds, greedy evaluation both ways.
+
+The part I didn't expect: none of that came from a better network. Flat MLP, a floor-axis
+convolution, per-car agents, and attention all landed within noise of each other. Months of
+architecture work, and it didn't matter.
+
+What actually moved the number was deleting a reward-shaping term — a small per-floor nudge that
+looked like harmless free signal and turned out to be actively working against the objective.
+
+The unglamorous supporting work: rebuilding the whole simulator from Unity/ML-Agents into a batched
+tensor environment, and proving it matched the original via differential testing at zero tolerance
+before trusting a single result from it.
+
+Full case study and the live sandbox in the comments.
+```
+
+**Hashtags:** `#ReinforcementLearning #MachineLearning #SimulationEngineering`
+**Image:** one of the `img/sandbox-live*` clips (once you've picked a favorite), or `img/results-M-unshaped.png`
+
+**First comment**
+
+```text
+Write-up: https://orbitope.github.io/rlevator/
+Code: https://github.com/orbitope/rlevator
+```
+
+*(article URL unverified — same flag as the rest of this kit)*
+
+---
+
 ## Asset index — `docs/promo/img/`
 
 All captured from `docs/index.html` itself by `scripts/capture_promo.mjs`, driving the article's own
@@ -202,19 +242,24 @@ Warm-up **Wed 5 – Thu 6 Aug**: ordinary commenting, no links, in r/WebGames an
 low-level commenting going in each week's target subs throughout — with a new account this matters
 more than any single post.
 
-| Week | Reddit #1 | Reddit #2 | X |
-|---|---|---|---|
-| 1 | Thu 6 Aug — **Gridlocked** → r/WebGames | Sat 8 Aug — r/puzzles | — (already posted) |
-| 2 | Tue 11 Aug — **Hex Truchet** → r/proceduralgeneration | Thu 13 Aug — r/tabletopgamedesign | Wed 12 Aug |
-| 3 | Tue 18 Aug — **Simulacrum** → r/reinforcementlearning | Thu 20 Aug — r/MachineLearning `[P]` (gated) | Wed 19 Aug |
-| 4 | Tue 25 Aug — **Pushman** → r/Unity3D | Thu 27 Aug — r/gamedev | Wed 26 Aug |
-| 5 | Tue 1 Sep — **RLevator** → r/reinforcementlearning | Thu 3 Sep — r/MachineLearning `[P]` (gated) | Wed 2 Sep |
+| Week | Reddit #1 | Reddit #2 | X | LinkedIn |
+|---|---|---|---|---|
+| 1 | Thu 6 Aug — **Gridlocked** → r/WebGames | Sat 8 Aug — r/puzzles | — (already posted) | Wed 5 Aug |
+| 2 | Tue 11 Aug — **Hex Truchet** → r/proceduralgeneration | Thu 13 Aug — r/tabletopgamedesign | Wed 12 Aug | Wed 12 Aug |
+| 3 | Tue 18 Aug — **Simulacrum** → r/reinforcementlearning | Thu 20 Aug — r/MachineLearning `[P]` (gated) | Wed 19 Aug | Wed 19 Aug |
+| 4 | Tue 25 Aug — **Pushman** → r/Unity3D | Thu 27 Aug — r/gamedev | Wed 26 Aug | Wed 26 Aug |
+| 5 | Tue 1 Sep — **RLevator** → r/reinforcementlearning | Thu 3 Sep — r/MachineLearning `[P]` (gated) | Wed 2 Sep | Wed 2 Sep |
 
 Reddit posts land Tuesday mornings US-Eastern; the second sub is staggered two days so two threads
 are never live at once. X threads go Wednesday, a day behind Reddit, so a good comment can be folded
 in. **r/MachineLearning is gated on account standing** — skip it if the account is still thin; both
 RL projects stand fine on r/reinforcementlearning alone. r/algorithms is deliberately unused: best
 topical fit for Gridlocked, but hostile to self-promotion from a new account. Revisit after week 5.
+
+LinkedIn rides the same Wednesday slot as X — one extra post to draft per week, no new day added.
+Body stays link-free on every LinkedIn post; the link goes in your own first comment once it's up,
+same convention as Reddit. Week 1's LinkedIn post (Wed 5 Aug) is the exception that runs a day ahead
+of the Reddit warm-up, since LinkedIn has no comment-karma ramp to respect.
 
 This is the second r/reinforcementlearning post — two full weeks after Simulacrum's, on a genuinely
 different topic. Don't compress that gap.
