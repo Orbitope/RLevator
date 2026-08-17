@@ -7,8 +7,16 @@
 <meta name="description" content="Elevator dispatch is a solved problem — until you're the one waiting. A reinforcement-learning case study: a hand-built simulator, PPO, and honest head-to-head measurement against the seventy-year-old LOOK heuristic. RL ties it in a small building and beats it in bigger ones — but the decisive change wasn't the network.">
 <meta property="og:title" content="What's Taking So Long?">
 <meta property="og:description" content="Elevator dispatch is solved — unless you're waiting for one. An interactive RL case study: what the agent sees, how it's scored, how its brain is wired, and the one change that actually beat the classic elevator heuristic.">
-<meta property="og:image" content="og.png">
 <meta property="og:type" content="article">
+<meta property="og:url" content="https://orbitope.com/RLevator/">
+<meta property="og:image" content="https://orbitope.com/RLevator/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://orbitope.com/RLevator/">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "Article", "headline": "What's Taking So Long?", "description": "Elevator dispatch is solved — unless you're waiting for one. An interactive RL case study: what the agent sees, how it's scored, how its brain is wired, and the one change that actually beat the classic elevator heuristic.", "image": "https://orbitope.com/RLevator/og.png", "url": "https://orbitope.com/RLevator/", "datePublished": "2026-07-01", "author": {"@type": "Person", "name": "Matthew Burke"}, "publisher": {"@type": "Organization", "name": "Orbitope"}}
+</script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KG3409EZDQ"></script>
 <script>
@@ -43,7 +51,11 @@ gtag('config', 'G-KG3409EZDQ');
       .rlv-scene { min-height: unset !important; padding: 8vh 0 !important; }
       .mobile-note { display: block; }
     }
-  </style>
+  
+/* Inline links to sibling Orbitope articles. Scoped to its own class because these pages do not all style a bare <a>. */
+.xref{color:var(--amber-bright,#E8C068);text-decoration:none;border-bottom:1px solid rgba(232,192,104,.38);transition:border-color .2s}
+.xref:hover{border-bottom-color:var(--amber-bright,#E8C068)}
+</style>
 </helmet>
 <div data-screen-label="Article" style="background:var(--void);color:var(--text-secondary);font-family:var(--font-body);">
 
@@ -104,7 +116,7 @@ gtag('config', 'G-KG3409EZDQ');
             <p style="font-size:15px;line-height:1.6;">Every half-second decision earns one number, summed from seven forces. Delivering a passenger is the big prize: <strong style="color:var(--amber);font-weight:600;">+10</strong>.</p>
             <p style="font-size:15px;line-height:1.6;">Underneath, two costs drip every second the system is congested &mdash; people riding, and, weighted three times heavier, people still waiting in the hall.</p>
             <p style="font-size:15px;line-height:1.6;">Let traffic overwhelm the cars and the catastrophic penalties bite: <strong style="color:var(--coral-bright);font-weight:600;">&minus;8</strong> when someone gives up, <strong style="color:var(--coral-bright);font-weight:600;">&minus;5</strong> when a full queue turns an arrival away.</p>
-            <p style="font-size:15px;line-height:1.6;">There's also a small shaping nudge in the original design: <strong style="color:var(--amber);font-weight:600;">&plusmn;0.4</strong> per floor a loaded car moves toward (or away from) a rider's destination. It looks harmless. Keep it in mind &mdash; it turns out to be the most important coefficient in the whole project, just not in the way you'd think.</p>
+            <p style="font-size:15px;line-height:1.6;">There's also a small shaping nudge in the original design: <strong style="color:var(--amber);font-weight:600;">&plusmn;0.4</strong> per floor a loaded car moves toward (or away from) a rider's destination. <a class="xref" href="https://orbitope.com/pushman/">It looks harmless. Keep it in mind</a> &mdash; it turns out to be the most important coefficient in the whole project, just not in the way you'd think.</p>
           </div>
         </section>
 
