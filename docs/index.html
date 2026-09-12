@@ -169,7 +169,7 @@ gtag('config', 'G-KG3409EZDQ');
           <div style="margin-top:26px;display:flex;flex-direction:column;gap:52vh;">
             <p style="font-size:15px;line-height:1.6;">Elevator dispatch is not an open problem. Buildings have run on hand-engineered rules for seventy years, and the rules are genuinely good: collective control (LOOK), cost-function dispatch, destination dispatch.</p>
             <p style="font-size:15px;line-height:1.6;">Take LOOK, the most common one. Each car sweeps in one direction, answering every call along the way, and turns around only when nothing is left ahead of it, like a bus that runs its route to the end and comes back. Unanswered hall calls get handed to whichever idle car is nearest. It needs no tuning, and in a quiet building it is hard to beat. What it can't do is <em>plan</em>. The assignment is greedy and car-by-car, with no picture of what the other cars, or the next minute of arrivals, will do. (The mechanics, and its stronger cost-function cousin, are laid out in full further down.)</p>
-            <p style="font-size:15px;line-height:1.6;">So the honest framing is narrower than &ldquo;RL beats elevators.&rdquo; A tuned rule set is a fixed strategy, and as buildings get bigger (more floors, more cars, more coordination between them) it should start leaving service on the table. That's the bet this project measures. In a small building I expect to lose. The interesting question is where the crossover is.</p>
+            <p style="font-size:15px;line-height:1.6;">So the honest framing here is narrow. A tuned rule set is a fixed strategy, and as buildings get bigger (more floors, more cars, more coordination between them) it should start leaving service on the table. That's the bet this project measures. In a small building I expect to lose. The interesting question is where the crossover is.</p>
           </div>
         </section>
 
@@ -280,7 +280,7 @@ gtag('config', 'G-KG3409EZDQ');
         </table>
 
         <h3 style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--text-bright);margin:34px 0 0;">The traffic makes the problem</h3>
-        <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">A dispatcher is only as interesting as the demand it faces, so the arrivals are a stochastic process with structure rather than a fixed schedule. Every tick, each floor draws a <strong style="color:var(--text-primary);">Poisson</strong> count of new passengers from a rate that follows a twelve-hour <strong style="color:var(--text-primary);">daily profile</strong> (48 fifteen-minute bins), and each new passenger draws a destination from an origin-dependent distribution. The profile is the sum of three overlapping demand components, and it's their balance over the day that produces the classic traffic patterns:</p>
+        <p style="font-size:15px;line-height:1.65;margin:12px 0 0;">A dispatcher is only as interesting as the demand it faces, so the arrivals are a stochastic process with structure. Every tick, each floor draws a <strong style="color:var(--text-primary);">Poisson</strong> count of new passengers from a rate that follows a twelve-hour <strong style="color:var(--text-primary);">daily profile</strong> (48 fifteen-minute bins), and each new passenger draws a destination from an origin-dependent distribution. The profile is the sum of three overlapping demand components, and it's their balance over the day that produces the classic traffic patterns:</p>
         <figure style="margin:20px 0 6px;">
           <svg viewBox="0 0 840 250" role="img" aria-label="Daily elevator-demand profile: an incoming morning up-peak, a broad midday interfloor plateau, and an outgoing evening down-peak." style="width:100%;height:auto;display:block;">
             <!-- axes -->
@@ -356,7 +356,7 @@ gtag('config', 'G-KG3409EZDQ');
           <tr><td>Per-car</td><td>1,366</td><td>8.9</td><td>27.0</td><td>5.0</td></tr>
           <tr><td>Conv</td><td>1,326</td><td>8.9</td><td>31.6</td><td>26.0</td></tr>
         </table>
-        <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Read those two columns against each other. <strong style="color:var(--text-primary);">Every structured network out-optimized the flat one on the training objective, and not one of them out-served it.</strong> They were learning the wrong thing better, not failing to learn. That pattern, higher reward but worse service, points at the reward itself.</p>
+        <p style="font-size:15px;line-height:1.65;margin:14px 0 0;">Read those two columns against each other. <strong style="color:var(--text-primary);">Every structured network out-optimized the flat one on the training objective, and not one of them out-served it.</strong> They were learning the wrong thing better. That pattern, higher reward but worse service, points at the reward itself.</p>
 
         <p style="font-size:15px;line-height:1.65;margin:26px 0 0;">The suspect was the &plusmn;0.4 movement nudge from scene 02. It pays a loaded car for drifting toward destinations whether or not anyone gets delivered, a subsidy the more expressive networks learned to farm. Deleting those two coefficients and retraining the plain flat MLP:</p>
         <table class="rlv">
